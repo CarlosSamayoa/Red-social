@@ -1,0 +1,23 @@
+{
+  "name": "insta-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "author": "carlos s",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@google-cloud/recaptcha-enterprise": "^6.3.0",
+    "face-api.js": "^0.22.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-google-recaptcha": "^3.1.0",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

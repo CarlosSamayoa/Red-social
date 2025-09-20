@@ -1,0 +1,9 @@
+{
+  "name": "lambda-image-processor",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "sharp": "^0.33.4",
+    "@aws-sdk/client-s3": "^3.637.0"
+  }
+}

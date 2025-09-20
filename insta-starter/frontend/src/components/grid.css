@@ -1,0 +1,57 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+.card {
+  display: block;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.08);
+  background: #111;
+}
+.card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  aspect-ratio: 1/1;
+}
+
+.card { position: relative; }
+.card .overlay { position:absolute; bottom:4px; right:4px; background:rgba(0,0,0,.5); color:white; font-size:12px; padding:2px 6px; border-radius:8px; }
+
+
+.card { position: relative; }
+.overlay {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  background: rgba(0,0,0,.6);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+
+.card { position: relative; }
+.card-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  padding: 8px; gap: 6px;
+  background: linear-gradient(to top, rgba(0,0,0,.35), rgba(0,0,0,0) 60%);
+  opacity: 0; transition: opacity .2s ease;
+}
+.card:hover .card-overlay { opacity: 1; }
+.heart {
+  border: none; background: rgba(255,255,255,.85);
+  border-radius: 999px; padding: 6px 10px; cursor: pointer;
+  font-size: 14px;
+}
+.heart.liked { background: #ffeff1; }
+.like-count {
+  color: white; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+  align-self: center;
+}
