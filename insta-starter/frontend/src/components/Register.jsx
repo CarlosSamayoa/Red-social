@@ -69,10 +69,65 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    
+    // Validaciones del lado del cliente
+    if (!formData.firstName.trim()) {
+      setError('Por favor ingresa tu nombre');
+      setLoading(false);
+      return;
+    }
+    
+    if (!formData.lastName.trim()) {
+      setError('Por favor ingresa tu apellido');
+      setLoading(false);
+      return;
+    }
+    
+    if (!formData.username.trim()) {
+      setError('Por favor ingresa un nombre de usuario');
+      setLoading(false);
+      return;
+    }
+    
+    if (formData.username.length < 3) {
+      setError('El nombre de usuario debe tener al menos 3 caracteres');
+      setLoading(false);
+      return;
+    }
+    
+    if (!formData.email.trim()) {
+      setError('Por favor ingresa tu email');
+      setLoading(false);
+      return;
+    }
+    
+    if (!formData.password) {
+      setError('Por favor ingresa una contraseña');
+      setLoading(false);
+      return;
+    }
+    
+    if (formData.password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      setLoading(false);
+      return;
+    }
+    
+    if (formData.password !== formData.confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      setLoading(false);
+      return;
+    }
+    
+    if (!captchaValue) {
+      setError('Por favor completa el reCAPTCHA');
+      setLoading(false);
+      return;
+    }
+    
     try {
       const data = await postJSON('/auth/register', {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        name: `${formData.firstName} ${formData.lastName}`.trim(),
         username: formData.username,
         email: formData.email,
         password: formData.password,
@@ -376,12 +431,18 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
               {error && (
                 <div
                   style={{
-                    color: '#e74c3c',
-                    marginBottom: 10,
-                    fontWeight: 600,
+                    color: '#ff6b6b',
+                    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                    border: '1px solid rgba(255, 107, 107, 0.3)',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    marginBottom: '16px',
+                    fontWeight: 500,
+                    fontSize: '0.95rem',
+                    lineHeight: '1.4',
                   }}
                 >
-                  {error}
+                  ⚠️ {error}
                 </div>
               )}
 
