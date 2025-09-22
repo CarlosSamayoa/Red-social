@@ -1,7 +1,7 @@
 FRONTEND
-npm --prefix "C:\Users\scajl\OneDrive\Escritorio\DESARROLLO WEB\proyecto final\insta-starter\frontend" run dev
-cd "C:\Users\scajl\OneDrive\Escritorio\DESARROLLO WEB\proyecto final\insta-starter\frontend"; npm run dev
+npm --prefix "/Users/carmicuxum/Documents/Red Social O/Red-social/insta-starter/frontend" run dev
+cd "/Users/carmicuxum/Documents/Red Social O/Red-social/insta-starter/frontend" && npm run dev
 
-backend
-npm --prefix "C:\Users\scajl\OneDrive\Escritorio\DESARROLLO WEB\proyecto final\insta-starter\backend" run dev
-cd "C:\Users\scajl\OneDrive\Escritorio\DESARROLLO WEB\proyecto final\insta-starter\backend"; npm run dev
+BACKEND
+npm --prefix "/Users/carmicuxum/Documents/Red Social O/Red-social/insta-starter/backend" run dev
+cd "/Users/carmicuxum/Documents/Red Social O/Red-social/insta-starter/backend" && npm run dev
