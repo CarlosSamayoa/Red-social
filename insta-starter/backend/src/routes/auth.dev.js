@@ -240,7 +240,21 @@ router.post('/register', [
   body('password').isLength({min:6}).withMessage('Password must be at least 6 characters')
 ], async (req, res, next) => {
   try {
-    assertValid(req);
+    // Validar campos
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const errorMessages = errors.array().map(e => {
+        // Hacer los mensajes más amigables
+        switch(e.path) {
+          case 'name': return 'El nombre es requerido';
+          case 'username': return 'El nombre de usuario es requerido (3-20 caracteres, solo letras, números y _)';
+          case 'email': return 'Ingresa un email válido';
+          case 'password': return 'La contraseña debe tener al menos 6 caracteres';
+          default: return e.msg;
+        }
+      }).join('. ');
+      return res.status(400).json({ error: errorMessages });
+    }
     
     const { email, username, name, password } = req.body;
     
@@ -258,16 +272,48 @@ router.post('/register', [
       }
     }
     
-    // Hash de la contraseña
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // Hash de la contraseña con el sistema mejorado
+    const password_salt = generateSalt();
+    const password_hash = await hashPasswordWithSalt(password, password_salt);
+    
+    // Extraer firstName y lastName del campo name
+    const nameParts = name.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || nameParts[0] || 'Usuario';
     
     // Crear usuario
-    const user = await User.create({
-      email,
-      username,
-      name,
-      password: hashedPassword
-    });
+    let user;
+    try {
+      user = await User.create({
+        email,
+        username,
+        name,
+        firstName,
+        lastName,
+        password_hash,
+        password_salt,
+        is_verified: true // Para desarrollo, marcar como verificado
+      });
+    } catch (mongoError) {
+      console.error('MongoDB Error:', mongoError);
+      if (mongoError.code === 11000) {
+        // Error de duplicado
+        if (mongoError.keyPattern?.email) {
+          return res.status(400).json({ error: 'Este email ya está registrado' });
+        }
+        if (mongoError.keyPattern?.username) {
+          return res.status(400).json({ error: 'Este nombre de usuario ya existe' });
+        }
+      }
+      if (mongoError.errors) {
+        // Errores de validación de Mongoose
+        const errorMsg = Object.values(mongoError.errors)
+          .map(err => err.message)
+          .join('. ');
+        return res.status(400).json({ error: errorMsg });
+      }
+      return res.status(400).json({ error: 'Error al crear el usuario. Por favor intenta de nuevo.' });
+    }
     
     const token = issueToken(user);
     res.status(201).json({ 
@@ -300,6 +346,14 @@ router.post('/dev-login', [
     const token = issueToken(user);
     res.json({ user: { id:String(user._id), email:user.email, username:user.username, name:user.name }, token });
   }catch(e){ next(e); }
+});
+
+// Middleware de manejo de errores para esta ruta
+router.use((error, req, res, next) => {
+  console.error('Auth error:', error);
+  res.status(error.status || 500).json({ 
+    error: error.message || 'Error interno del servidor' 
+  });
 });
 
 export default router;

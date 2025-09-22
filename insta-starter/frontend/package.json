@@ -19,5 +19,8 @@
   },
   "devDependencies": {
     "vite": "^5.4.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.50.1"
   }
 }
