@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getJSON, STATIC } from '../api';
+import { getJSON, STATIC, API } from '../api';
 import './grid.css';
 import Avatar from './Avatar.jsx';
 
@@ -31,7 +31,7 @@ export default function UserProfile({ currentUser, openChat }) {
     if(!info) return;
     setBusy(true);
     try{
-      const base = import.meta.env.VITE_API || 'http://localhost:8080/api';
+      const base = API;
       if(info.isFollowing){
         await fetch(`${base}/follows/${username}`, { method:'DELETE', headers:{ Authorization:`Bearer ${localStorage.getItem('token')}` }});
         setInfo({...info, isFollowing:false, stats:{...info.stats, followers: Math.max(0, info.stats.followers-1)}});
@@ -51,9 +51,9 @@ export default function UserProfile({ currentUser, openChat }) {
       padding: '24px',
       maxWidth: 1000,
       margin: '0 auto',
-      background: 'rgba(255, 255, 255, 0.95)',
+      background: 'var(--bg-card)',
       borderRadius: '20px',
-      boxShadow: '0 8px 32px rgba(23, 72, 113, 0.1)',
+      boxShadow: '0 8px 32px var(--shadow-color)',
       backdropFilter: 'blur(20px)'
     }}>
       <header style={{
@@ -72,7 +72,7 @@ export default function UserProfile({ currentUser, openChat }) {
             margin: '0 0 8px',
             fontSize: '24px',
             fontWeight: '700',
-            color: '#174871'
+            color: 'var(--secondary)'
           }}>
             @{info.username}
           </h2>
@@ -80,7 +80,7 @@ export default function UserProfile({ currentUser, openChat }) {
             display: 'flex',
             gap: 24,
             fontSize: 16,
-            color: '#444',
+            color: 'var(--text-primary)',
             marginBottom: 12
           }}>
             <span style={{
@@ -127,10 +127,10 @@ export default function UserProfile({ currentUser, openChat }) {
               disabled={busy}
               style={{
                 background: info.isFollowing 
-                  ? 'linear-gradient(135deg, #e0e0e0, #f5f5f5)' 
+                  ? 'var(--bg-tertiary)' 
                   : 'linear-gradient(135deg, #A77693, #174871)',
-                color: info.isFollowing ? '#333' : 'white',
-              border: info.isFollowing ? '2px solid #ccc' : 'none',
+                color: info.isFollowing ? 'var(--text-primary)' : 'white',
+              border: info.isFollowing ? '2px solid var(--border-color)' : 'none',
               padding: '10px 20px',
               borderRadius: '25px',
               fontWeight: '600',
@@ -139,7 +139,7 @@ export default function UserProfile({ currentUser, openChat }) {
               minWidth: '100px',
               opacity: busy ? 0.7 : 1,
               transition: 'all 0.3s ease',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+              boxShadow: '0 2px 10px var(--shadow-color)'
             }}
             onMouseEnter={(e) => {
               if (!busy) {
@@ -196,7 +196,31 @@ export default function UserProfile({ currentUser, openChat }) {
         marginTop: '24px'
       }}>
         {posts.map(p => {
-          const thumb = p.file?.variants?.find(v=>v.kind==='thumb')?.s3_key || p.file?.s3_key_original;
+          // Determinar si tiene múltiples medios
+          const hasMultipleMedia = p.media && p.media.length > 0;
+          const mediaCount = hasMultipleMedia ? p.media.length : (p.file ? 1 : 0);
+          
+          // Obtener thumbnail: priorizar primer media si existe, sino usar file legacy
+          let thumb;
+          let isVideo = false;
+          
+          if (hasMultipleMedia && p.media[0]) {
+            // Nuevo formato con array media
+            const firstMedia = p.media[0];
+            isVideo = firstMedia.media_type === 'video';
+            
+            if (isVideo) {
+              // Para videos, usar el original (no hay variants)
+              thumb = firstMedia.s3_key_original;
+            } else {
+              // Para imágenes, buscar thumb variant
+              thumb = firstMedia.variants?.find(v => v.kind === 'thumb')?.s3_key || firstMedia.s3_key_original;
+            }
+          } else {
+            // Formato legacy con file único
+            thumb = p.file?.variants?.find(v => v.kind === 'thumb')?.s3_key || p.file?.s3_key_original;
+          }
+          
           return (
             <Link 
               key={p._id} 
@@ -204,20 +228,22 @@ export default function UserProfile({ currentUser, openChat }) {
               className="card"
               style={{
                 display: 'block',
+                position: 'relative',
                 aspectRatio: '1',
                 borderRadius: '12px',
                 overflow: 'hidden',
-                boxShadow: '0 4px 20px rgba(23, 72, 113, 0.1)',
+                boxShadow: '0 4px 20px var(--shadow-color)',
                 transition: 'transform 0.3s ease, boxShadow 0.3s ease',
-                background: 'linear-gradient(135deg, #f8f9fa, #e9ecef)'
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)'
               }}
               onMouseEnter={(e) => {
-                e.target.style.transform = 'scale(1.05)';
-                e.target.style.boxShadow = '0 8px 30px rgba(23, 72, 113, 0.2)';
+                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.boxShadow = '0 8px 30px var(--shadow-color)';
               }}
               onMouseLeave={(e) => {
-                e.target.style.transform = 'scale(1)';
-                e.target.style.boxShadow = '0 4px 20px rgba(23, 72, 113, 0.1)';
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 4px 20px var(--shadow-color)';
               }}
             >
               <img 
@@ -229,6 +255,44 @@ export default function UserProfile({ currentUser, openChat }) {
                   objectFit: 'cover'
                 }}
               />
+              
+              {/* Indicador de múltiples medios */}
+              {mediaCount > 1 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backdropFilter: 'blur(4px)'
+                }}>
+                  📷 {mediaCount}
+                </div>
+              )}
+              
+              {/* Indicador de video */}
+              {isVideo && (
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  left: '8px',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  backdropFilter: 'blur(4px)'
+                }}>
+                  ▶️
+                </div>
+              )}
             </Link>
           );
         })}

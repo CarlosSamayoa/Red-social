@@ -45,33 +45,30 @@ app.use(helmet({
     }
   }
 }));
+app.use(morgan('dev'));
+
+// Usar cors package con una lista de orígenes permitidos. Evita middleware manual que pueda duplicar headers.
+const allowedOrigins = [
+  'http://localhost:5173', 
+  'http://localhost:5174', 
+  'http://localhost:3000',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'],
+  origin: (origin, cb) => {
+    // permitir solicitudes sin origin (curl, server-to-server, Postman)
+    if (!origin) return cb(null, true);
+    // permitir si está en la lista
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    // rechazar sin error (simplemente no permitir)
+    return cb(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  preflightContinue: false,
   optionsSuccessStatus: 204
 }));
-app.use(morgan('dev'));
-
-// Middleware global para CORS preflight
-app.use((req, res, next) => {
-  const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
-  const origin = req.headers.origin;
-  
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  
-  if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    return res.sendStatus(204);
-  }
-  next();
-});
 
 // Servir estáticos locales (solo dev) con CORS
 import path from 'path';

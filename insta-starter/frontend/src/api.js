@@ -1,4 +1,4 @@
-const API = import.meta.env.VITE_API || 'http://localhost:3001/api';
+export const API = import.meta.env.VITE_API || 'http://localhost:3002/api';
 export function authHeaders() {
   const t = localStorage.getItem('token') || '';
   return t ? { Authorization: `Bearer ${t}` } : {};
@@ -74,7 +74,9 @@ export async function deleteJSON(path) {
   return r.json();
 }
 
-export const STATIC = 'http://localhost:3001/static';
+// Derivar STATIC desde API para usar el mismo host/puerto
+const apiBase = import.meta.env.VITE_API || 'http://localhost:3002/api';
+export const STATIC = apiBase.replace('/api', '/static');
 
 // Función para limpiar autenticación
 export function clearAuth() {

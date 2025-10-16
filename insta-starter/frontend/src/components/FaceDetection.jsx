@@ -320,11 +320,11 @@ function FaceDetection({ imageFile, onFacesDetected }) {
         <div style={{ 
           marginTop: '12px', 
           padding: '12px',
-          background: '#fff3cd',
-          border: '1px solid #ffeaa7',
+          background: 'rgba(255, 193, 7, 0.15)',
+          border: '1px solid rgba(255, 193, 7, 0.5)',
           borderRadius: '4px',
           fontSize: '12px', 
-          color: '#856404'
+          color: 'var(--warning-color, #856404)'
         }}>
           ⚠️ Reconocimiento facial no disponible (función opcional)
         </div>

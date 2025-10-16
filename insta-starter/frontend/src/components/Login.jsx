@@ -275,12 +275,13 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
               width: '100%',
               padding: '0.8rem 0',
               borderRadius: 20,
-              background: '#fff',
+              background: 'var(--bg-card)',
               color: '#185adb',
               fontWeight: 600,
               fontSize: '1rem',
               boxShadow: '0 2px 8px #185adb22',
               marginBottom: 18,
+              border: '1px solid var(--border-color)'
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24">

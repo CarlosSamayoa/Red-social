@@ -39,11 +39,20 @@ router.post('/dm', requireAuth, [ body('userId').notEmpty() ], async (req,res,ne
     const c = await Conversation.create({});
     console.log('Conversation created:', c._id);
     
-    await ConversationParticipant.create([
-      { conversation: c._id, user: currentUserId }, 
-      { conversation: c._id, user: targetUserId }
-    ]);
-    console.log('Participants created');
+    // Usar insertMany con ordered:false para evitar errores de duplicados
+    try {
+      await ConversationParticipant.insertMany([
+        { conversation: c._id, user: currentUserId }, 
+        { conversation: c._id, user: targetUserId }
+      ], { ordered: false });
+      console.log('Participants created');
+    } catch (err) {
+      // Ignorar errores de duplicados (E11000)
+      if (err.code !== 11000) {
+        throw err;
+      }
+      console.log('Participants already exist, continuing...');
+    }
     
     res.status(201).json({ conversationId: c._id });
   }catch(e){ 

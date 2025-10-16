@@ -2,6 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getJSON, postJSON, STATIC } from '../api';
 import Avatar from './Avatar.jsx';
+import MediaCarousel from './MediaCarousel.jsx';
+
+// Mapa de filtros CSS
+const IMAGE_FILTERS = {
+  original: 'none',
+  grayscale: 'grayscale(100%)',
+  sepia: 'sepia(100%)',
+  vintage: 'sepia(50%) contrast(120%) brightness(90%)',
+  cool: 'saturate(120%) hue-rotate(20deg)',
+  warm: 'saturate(130%) hue-rotate(-20deg) brightness(110%)',
+  contrast: 'contrast(150%) brightness(105%)',
+  bright: 'brightness(130%) saturate(110%)',
+  soft: 'blur(1px) brightness(110%)',
+  dramatic: 'contrast(160%) saturate(80%)'
+};
 
 function PostCard({ post, likes, onToggleLike, onAddComment }) {
   const [comment, setComment] = useState('')
@@ -13,7 +28,20 @@ function PostCard({ post, likes, onToggleLike, onAddComment }) {
   const [loadingFriends, setLoadingFriends] = useState(false)
   
   const likeData = likes[post._id] || { count: 0, liked: false }
-  const imageUrl = post.file?.variants?.find(v=>v.kind==='medium')?.s3_key || post.file?.s3_key_original
+  
+  // Determinar si el post tiene múltiples medios o formato legacy
+  const hasMultipleMedia = post.media && post.media.length > 0
+  const mediaCount = hasMultipleMedia ? post.media.length : (post.file ? 1 : 0)
+  
+  // Debug: Ver qué datos tiene el post
+  console.log('📊 Feed PostCard data:', {
+    postId: post._id,
+    hasMultipleMedia,
+    mediaCount,
+    mediaArray: post.media,
+    legacyFile: post.file,
+    legacyFilter: post.filter
+  })
   
   // Cerrar menú de compartir cuando se hace clic fuera
   useEffect(() => {
@@ -197,7 +225,7 @@ function PostCard({ post, likes, onToggleLike, onAddComment }) {
             fontWeight: '600'
           }}>
             <Link 
-              to={`/users/${post.user?.username || 'unknown'}`} 
+              to={`/u/${post.user?.username || 'unknown'}`} 
               className="username"
               style={{
                 color: '#174871',
@@ -217,17 +245,16 @@ function PostCard({ post, likes, onToggleLike, onAddComment }) {
         </div>
       </header>
 
-      {imageUrl && (
-        <img 
-          src={`${STATIC}/${imageUrl}`} 
-          alt={post.text || 'Post image'}
-          className="post-image"
+      {mediaCount > 0 && (
+        <MediaCarousel 
+          media={post.media || []}
+          legacyFile={post.file}
+          legacyFilter={post.filter}
           style={{
-            width: '100%',
-            maxHeight: '600px',
-            objectFit: 'cover',
-            display: 'block'
+            borderRadius: '0',
+            maxHeight: '600px'
           }}
+          showControls={true}
         />
       )}
 
@@ -326,10 +353,10 @@ function PostCard({ post, likes, onToggleLike, onAddComment }) {
               position: 'absolute',
               bottom: '100%',
               left: '0',
-              background: 'white',
-              border: '1px solid #ddd',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
               borderRadius: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              boxShadow: '0 4px 12px var(--shadow-color)',
               padding: '8px 0',
               minWidth: '200px',
               zIndex: 1000,
@@ -780,11 +807,12 @@ export default function Feed(){
     return (
       <div style={{ 
         textAlign: 'center', 
-        color: '#e74c3c', 
+        color: 'var(--error-color)', 
         padding: '40px',
-        background: 'white',
+        background: 'var(--bg-card)',
         borderRadius: '12px',
-        margin: '20px 0'
+        margin: '20px 0',
+        border: '1px solid var(--border-color)'
       }}>
         <h3>😔 Oops!</h3>
         <p>{error}</p>
@@ -793,7 +821,7 @@ export default function Feed(){
           style={{
             marginTop: '15px',
             padding: '10px 20px',
-            background: 'linear-gradient(135deg, #A77693, #174871)',
+            background: 'var(--gradient-primary)',
             color: 'white',
             border: 'none',
             borderRadius: '20px',
@@ -834,19 +862,20 @@ export default function Feed(){
       {posts.length === 0 ? (
         <div style={{ 
           textAlign: 'center', 
-          color: '#8e8e8e', 
+          color: 'var(--text-secondary)', 
           padding: '60px 20px',
-          background: 'white',
-          borderRadius: '12px'
+          background: 'var(--bg-card)',
+          borderRadius: '12px',
+          border: '1px solid var(--border-color)'
         }}>
-          <h3 style={{ marginBottom: '15px' }}>¡Tu feed está vacío! 📱</h3>
+          <h3 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>¡Tu feed está vacío! 📱</h3>
           <p>Sigue a más usuarios para ver contenido aquí.</p>
         </div>
       ) : (
         <>
-          {posts.map(post => (
+          {posts.map((post, index) => (
             <PostCard 
-              key={post._id} 
+              key={`${post._id}-${index}`} 
               post={post} 
               likes={likes} 
               onToggleLike={toggleLike} 
