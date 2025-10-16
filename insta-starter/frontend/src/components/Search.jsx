@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { getJSON, postJSON, deleteJSON, STATIC } from '../api';
+import MediaCarousel from './MediaCarousel';
 
 export default function Search(){
   const [params, setParams] = useSearchParams();
@@ -505,6 +506,7 @@ function PostCard({ post, onClick }) {
   console.log('PostCard received post:', {
     id: post._id,
     file: post.file,
+    media: post.media,
     likes_count: post.likes_count,
     likesCount: post.likesCount,
     comments_count: post.comments_count,
@@ -512,10 +514,30 @@ function PostCard({ post, onClick }) {
     user: post.user
   });
   
-  const imageUrl = post.file?.variants?.find(v=>v.kind==='medium')?.s3_key || post.file?.s3_key_original;
+  // 🎯 Soporte para media[] (nuevo formato) y file (legacy)
+  const mediaArray = post.media || [];
+  const hasMultipleMedia = mediaArray.length > 1;
+  const firstMedia = mediaArray[0];
+  const isVideo = firstMedia?.media_type === 'video';
+  
+  // Obtener URL de la miniatura
+  let imageUrl = null;
+  if (firstMedia) {
+    // Nuevo formato con media[]
+    imageUrl = firstMedia.variants?.find(v => v.kind === 'medium')?.s3_key || 
+               firstMedia.variants?.find(v => v.kind === 'thumb')?.s3_key ||
+               firstMedia.s3_key_original;
+  } else if (post.file) {
+    // Legacy format
+    imageUrl = post.file.variants?.find(v => v.kind === 'medium')?.s3_key || 
+               post.file.s3_key_original;
+  }
+  
   const fullImageUrl = imageUrl ? `${STATIC}/${imageUrl}` : null;
   console.log('Image URL for post:', imageUrl);
   console.log('Full image URL for post:', fullImageUrl);
+  console.log('Has multiple media:', hasMultipleMedia, 'count:', mediaArray.length);
+  console.log('Is video:', isVideo);
   console.log('Final likes count:', post.likes_count || post.likesCount || 0);
   console.log('Final comments count:', post.comments_count || post.commentsCount || 0);
   
@@ -564,7 +586,33 @@ function PostCard({ post, onClick }) {
         }
       }}
     >
-      {fullImageUrl ? (
+      {isVideo ? (
+        // 🎬 Para videos, mostrar un placeholder con icono de play
+        <div style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, rgba(167, 118, 147, 0.3), rgba(23, 72, 113, 0.3))',
+          color: 'white',
+          fontSize: '48px',
+          position: 'relative'
+        }}>
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.6)',
+            borderRadius: '50%',
+            width: '80px',
+            height: '80px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '40px'
+          }}>
+            ▶️
+          </div>
+        </div>
+      ) : fullImageUrl ? (
         <img
           src={fullImageUrl}
           alt="Post"
@@ -586,6 +634,38 @@ function PostCard({ post, onClick }) {
           fontSize: '24px'
         }}>
           📝
+        </div>
+      )}
+      
+      {/* 🎬 Indicadores de múltiples medios o video (esquina superior derecha) */}
+      {(hasMultipleMedia || isVideo) && (
+        <div style={{
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
+          background: 'rgba(0, 0, 0, 0.7)',
+          color: 'white',
+          padding: '4px 8px',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          backdropFilter: 'blur(4px)',
+          zIndex: 2
+        }}>
+          {isVideo ? (
+            <>
+              <span>▶️</span>
+              {hasMultipleMedia && <span>{mediaArray.length}</span>}
+            </>
+          ) : (
+            <>
+              <span>📷</span>
+              <span>{mediaArray.length}</span>
+            </>
+          )}
         </div>
       )}
       
@@ -660,11 +740,14 @@ function PostCard({ post, onClick }) {
 }
 
 function PostModal({ post, onClose }) {
-  const imageUrl = post.file?.variants?.find(v=>v.kind==='medium')?.s3_key || post.file?.s3_key_original;
-  const fullImageUrl = imageUrl ? `${STATIC}/${imageUrl}` : null;
-  console.log('🖼️ Modal imageUrl:', imageUrl);
+  // 🎯 Soporte para media[] (nuevo) y file (legacy)
+  const mediaArray = post.media || [];
+  const legacyFile = !mediaArray.length && post.file ? post.file.s3_key_original : null;
+  const legacyFilter = !mediaArray.length && post.file ? post.filter : null;
+  
+  console.log('🖼️ Modal media array:', mediaArray);
+  console.log('🖼️ Modal legacy file:', legacyFile);
   console.log('🖼️ Modal STATIC:', STATIC);
-  console.log('🖼️ Modal complete URL:', fullImageUrl);
   
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes_count || post.likesCount || 0);
@@ -866,14 +949,15 @@ function PostModal({ post, onClose }) {
     >
       <div
         style={{
-          background: 'white',
+          background: 'var(--bg-card)',
           borderRadius: '16px',
           maxWidth: '900px',
           maxHeight: '90vh',
           width: '100%',
           overflow: 'hidden',
           display: 'flex',
-          flexDirection: window.innerWidth > 768 ? 'row' : 'column'
+          flexDirection: window.innerWidth > 768 ? 'row' : 'column',
+          border: '1px solid var(--border-color)'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -886,35 +970,12 @@ function PostModal({ post, onClose }) {
           background: '#000',
           minHeight: window.innerWidth > 768 ? '500px' : '300px'
         }}>
-          {fullImageUrl ? (
-            <img
-              src={fullImageUrl}
-              alt="Post"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain'
-              }}
-              onLoad={() => console.log('✅ Modal image loaded successfully')}
-              onError={(e) => {
-                console.error('❌ Modal image failed to load:', e.target.src);
-                console.error('❌ Error details:', e);
-              }}
-            />
-          ) : (
-            <div style={{
-              width: '100%',
-              height: '400px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(167, 118, 147, 0.1), rgba(23, 72, 113, 0.1))',
-              color: '#A77693',
-              fontSize: '48px'
-            }}>
-              📝
-            </div>
-          )}
+          {/* 🎬 MediaCarousel para soporte de múltiples imágenes y videos */}
+          <MediaCarousel 
+            media={mediaArray}
+            legacyFile={legacyFile}
+            legacyFilter={legacyFilter}
+          />
         </div>
 
         {/* Right side - Content */}
@@ -1107,10 +1168,10 @@ function PostModal({ post, onClose }) {
                     position: 'absolute',
                     bottom: '100%',
                     left: '0',
-                    background: 'white',
-                    border: '1px solid #ddd',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    boxShadow: '0 4px 12px var(--shadow-color)',
                     padding: '8px 0',
                     minWidth: '200px',
                     zIndex: 1000,

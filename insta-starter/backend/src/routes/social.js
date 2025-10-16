@@ -37,11 +37,18 @@ router.delete('/follows/:username', requireAuth, async (req,res,next)=>{
 
 // Create post (after upload)
 router.post('/posts', requireAuth, [
-  body('file.s3_key_original').notEmpty(),
   body('text').optional().isString(),
   body('location').optional().isString()
 ], async (req,res,next)=>{
   try{
+    // Validar que tenga al menos un medio (nuevo formato con media[] o legacy con file)
+    if (!req.body.media?.length && !req.body.file?.s3_key_original) {
+      return res.status(400).json({ 
+        error: 'validation_error',
+        message: 'Se requiere al menos un archivo (media o file)' 
+      });
+    }
+    
     assertValid(req);
     const post = await Publication.create({ user:req.user.id, ...req.body });
     res.status(201).json({ post });
@@ -69,6 +76,26 @@ router.get('/feed', requireAuth, [ query('page').optional().isInt({min:1}).toInt
       .skip(skip)
       .limit(limit)
       .lean();
+    
+    // Debug: Ver qué campos tienen los posts
+    if (posts.length > 0) {
+      console.log('📊 Feed sample post:', {
+        _id: posts[0]._id,
+        hasMedia: !!posts[0].media,
+        mediaLength: posts[0].media?.length,
+        mediaType: typeof posts[0].media,
+        mediaIsArray: Array.isArray(posts[0].media),
+        hasFile: !!posts[0].file,
+        fileKeys: posts[0].file ? Object.keys(posts[0].file) : [],
+        allKeys: Object.keys(posts[0])
+      });
+      
+      // Si el primer post tiene media, mostrar el primer item
+      if (posts[0].media && posts[0].media.length > 0) {
+        console.log('📷 First media item:', posts[0].media[0]);
+      }
+    }
+    
     res.json({ posts });
   }catch(e){ next(e); }
 });
@@ -196,6 +223,7 @@ router.get('/feed/infinite', requireAuth, [
           text: 1,
           location: 1,
           file: 1,
+          media: 1,
           created_at: 1
         }
       }
@@ -219,6 +247,7 @@ router.get('/feed/infinite', requireAuth, [
           text: 1,
           location: 1,
           file: 1,
+          media: 1,
           created_at: 1
         }
       }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getJSON, postJSON } from '../api';
 import Avatar from './Avatar.jsx';
@@ -18,11 +18,25 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
   const [messagePollingInterval, setMessagePollingInterval] = useState(null);
   const [typingInterval, setTypingInterval] = useState(null);
   const [typingTimeout, setTypingTimeout] = useState(null);
+  const messagesContainerRef = useRef(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  };
 
   useEffect(() => {
     // Get current user ID from localStorage or user data
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    setCurrentUserId(user.id);
+    const userId = user.id || user._id;
+    console.log('ChatWindow - Setting currentUserId:', userId, 'from user:', user);
+    setCurrentUserId(userId);
   }, []);
 
   useEffect(() => {
@@ -68,11 +82,28 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
     setLoading(true);
     try {
       const response = await getJSON(`/dm/${conversationId}/messages`);
-      setMessages(response.messages || []);
+      console.log('Raw messages from backend:', response.messages?.length);
+      if (response.messages?.length > 0) {
+        console.log('First message created_at:', response.messages[0].created_at);
+        console.log('Last message created_at:', response.messages[response.messages.length - 1].created_at);
+      }
+      
+      // Ordenar mensajes por fecha (más viejos primero)
+      const sortedMessages = (response.messages || []).sort((a, b) => {
+        const dateA = new Date(a.created_at || a.createdAt).getTime();
+        const dateB = new Date(b.created_at || b.createdAt).getTime();
+        return dateA - dateB; // Ascendente: viejos primero
+      });
+      
+      console.log('After sorting - First:', sortedMessages[0]?.created_at, 'Last:', sortedMessages[sortedMessages.length - 1]?.created_at);
+      setMessages(sortedMessages);
       setActiveConversation(conversationId);
       
       // Start polling for new messages
       startMessagePolling(conversationId);
+      
+      // Scroll to bottom after loading messages
+      setTimeout(() => scrollToBottom(), 100);
     } catch (err) {
       console.error('Failed to load messages:', err);
     } finally {
@@ -97,7 +128,13 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
         setMessages(currentMessages => {
           if (newMessages.length !== currentMessages.length) {
             console.log('New messages received:', newMessages.length - currentMessages.length);
-            return newMessages;
+            // Ordenar mensajes por fecha (más viejos primero)
+            const sortedMessages = [...newMessages].sort((a, b) => {
+              const dateA = new Date(a.created_at || a.createdAt).getTime();
+              const dateB = new Date(b.created_at || b.createdAt).getTime();
+              return dateA - dateB; // Ascendente: viejos primero
+            });
+            return sortedMessages;
           }
           return currentMessages;
         });
@@ -164,7 +201,14 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
       
       // Immediately reload messages to show the new one
       const response = await getJSON(`/dm/${activeConversation}/messages`);
-      setMessages(response.messages || []);
+      // Ordenar mensajes por fecha (más viejos primero)
+      const sortedMessages = (response.messages || []).sort((a, b) => {
+        const dateA = new Date(a.created_at || a.createdAt).getTime();
+        const dateB = new Date(b.created_at || b.createdAt).getTime();
+        return dateA - dateB; // Ascendente: viejos primero
+      });
+      console.log('After sending - Messages sorted:', sortedMessages.length);
+      setMessages(sortedMessages);
       
     } catch (err) {
       console.error('Failed to send message:', err);
@@ -247,37 +291,41 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
+      background: 'rgba(0, 0, 0, 0.7)',
+      backdropFilter: 'blur(8px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000
     }}>
       <div style={{
-        background: 'white',
+        background: 'var(--bg-card)',
         borderRadius: '20px',
         width: '80%',
         maxWidth: '800px',
         height: '70%',
         display: 'flex',
         overflow: 'hidden',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+        boxShadow: '0 20px 60px var(--shadow-color)',
+        border: '1px solid var(--border-color)'
       }}>
         {/* Conversations List */}
         <div style={{
           width: '300px',
-          borderRight: '1px solid #e0e0e0',
+          borderRight: '1px solid var(--border-color)',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          background: 'var(--bg-secondary)'
         }}>
           <div style={{
             padding: '20px',
-            borderBottom: '1px solid #e0e0e0',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            background: 'var(--bg-card)'
           }}>
-            <h3 style={{ margin: 0, color: '#174871' }}>Messages</h3>
+            <h3 style={{ margin: 0, color: 'var(--primary)' }}>Mensajes</h3>
             <button
               onClick={onClose}
               style={{
@@ -285,8 +333,11 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
                 border: 'none',
                 fontSize: '20px',
                 cursor: 'pointer',
-                color: '#666'
+                color: 'var(--text-secondary)',
+                transition: 'color 0.2s'
               }}
+              onMouseEnter={(e) => e.target.style.color = 'var(--text-primary)'}
+              onMouseLeave={(e) => e.target.style.color = 'var(--text-secondary)'}
             >
               ✕
             </button>
@@ -297,47 +348,70 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
               <div style={{
                 textAlign: 'center',
                 padding: '40px 20px',
-                color: '#8e8e8e'
+                color: 'var(--text-secondary)'
               }}>
                 No conversations yet
               </div>
             ) : (
-              conversations.map(conv => {
-                // Find the other participant (not the current user)
-                const otherParticipant = conv.participants?.find(p => p._id !== currentUserId);
-                
-                return (
-                  <div
-                    key={conv.conversation}
-                    onClick={() => {
-                      setActiveConversation(conv.conversation);
-                      loadMessages(conv.conversation);
-                    }}
-                    style={{
-                      padding: '15px 20px',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid #f0f0f0',
-                      background: activeConversation === conv.conversation ? '#f8f9fa' : 'white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px'
-                    }}
-                  >
-                    <Avatar 
-                      username={otherParticipant?.username || 'Unknown'} 
-                      size={40}
-                    />
-                    <div>
-                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                        {otherParticipant?.username || 'Unknown User'}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#8e8e8e' }}>
-                        Click to chat
+              conversations
+                .filter(conv => {
+                  // Filtrar conversaciones sin participantes válidos
+                  if (!conv.participants || conv.participants.length === 0) return false;
+                  const otherParticipant = conv.participants.find(p => p._id !== currentUserId);
+                  return otherParticipant && otherParticipant.username;
+                })
+                .map(conv => {
+                  // Find the other participant (not the current user)
+                  const otherParticipant = conv.participants.find(p => p._id !== currentUserId);
+                  
+                  return (
+                    <div
+                      key={conv.conversation}
+                      onClick={() => {
+                        setActiveConversation(conv.conversation);
+                        loadMessages(conv.conversation);
+                      }}
+                      style={{
+                        padding: '15px 20px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid var(--border-color)',
+                        background: activeConversation === conv.conversation ? 'var(--bg-hover)' : 'var(--bg-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        transition: 'background 0.2s'
+                      }}
+                    >
+                      <Avatar 
+                        username={otherParticipant?.username} 
+                        size={40}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ 
+                          fontWeight: '600', 
+                          marginBottom: '4px',
+                          color: 'var(--text-primary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {otherParticipant?.username}
+                        </div>
+                        <div style={{ 
+                          fontSize: '12px', 
+                          color: 'var(--text-secondary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {otherParticipant?.firstName && otherParticipant?.lastName 
+                            ? `${otherParticipant.firstName} ${otherParticipant.lastName}`
+                            : 'Click to chat'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
             )}
           </div>
         </div>
@@ -353,8 +427,8 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
               {/* Messages Header */}
               <div style={{
                 padding: '20px',
-                borderBottom: '1px solid #e0e0e0',
-                background: '#f8f9fa',
+                borderBottom: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px'
@@ -368,8 +442,8 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
                         username={otherParticipant?.username || 'Unknown'} 
                         size={40}
                       />
-                      <h4 style={{ margin: 0, color: '#174871' }}>
-                        {otherParticipant?.username || 'Unknown User'}
+                      <h4 style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '600' }}>
+                        @{otherParticipant?.username || 'Unknown User'}
                       </h4>
                     </>
                   );
@@ -377,62 +451,117 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
               </div>
 
               {/* Messages List */}
-              <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '20px',
-                display: 'flex',
-                flexDirection: 'column-reverse'
-              }}>
+              <div 
+                ref={messagesContainerRef}
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  background: 'var(--bg-primary)'
+                }}
+              >
                 {loading ? (
-                  <div style={{ textAlign: 'center', color: '#8e8e8e' }}>
-                    Loading messages...
+                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
+                    ⏳ Cargando mensajes...
                   </div>
                 ) : messages.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#8e8e8e' }}>
-                    No messages yet. Start the conversation!
+                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
+                    📭 No hay mensajes aún. ¡Empieza la conversación!
                   </div>
                 ) : (
-                  messages.map(message => (
-                    <div
-                      key={message._id}
-                      style={{
-                        marginBottom: '15px',
-                        display: 'flex',
-                        justifyContent: message.sender === currentUserId ? 'flex-end' : 'flex-start'
-                      }}
-                    >
-                      <div style={{
-                        maxWidth: '70%',
-                        padding: '10px 15px',
-                        borderRadius: '18px',
-                        background: message.sender === currentUserId 
-                          ? 'linear-gradient(135deg, #A77693, #174871)'
-                          : '#f0f0f0',
-                        color: message.sender === currentUserId ? 'white' : '#333'
-                      }}>
-                        {message.body}
+                  <>
+                    {messages.map((message, index) => {
+                      const isMine = String(message.sender) === String(currentUserId) || 
+                                     String(message.sender?._id) === String(currentUserId);
+                      
+                      // Log solo el primer mensaje para ver estructura
+                      if (index === 0) {
+                        console.log('First message structure:', message);
+                        console.log('Available date fields:', {
+                          createdAt: message.createdAt,
+                          created_at: message.created_at,
+                          timestamp: message.timestamp,
+                          date: message.date,
+                          _id: message._id
+                        });
+                      }
+                      
+                      return (
+                      <div
+                        key={message._id}
+                        style={{
+                          marginBottom: '15px',
+                          display: 'flex',
+                          justifyContent: isMine ? 'flex-end' : 'flex-start',
+                          animation: 'fadeIn 0.3s ease-in'
+                        }}
+                      >
+                        <div style={{
+                          maxWidth: '70%',
+                          padding: '12px 16px',
+                          borderRadius: '18px',
+                          background: isMine 
+                            ? 'linear-gradient(135deg, #A77693, #174871)'
+                            : 'var(--bg-tertiary)',
+                          color: isMine ? 'white' : 'var(--text-primary)',
+                          boxShadow: '0 2px 8px var(--shadow-color)',
+                          wordWrap: 'break-word'
+                        }}>
+                        <div>{message.body}</div>
+                        {/* Timestamp para debug */}
+                        <div style={{ 
+                          fontSize: '10px', 
+                          opacity: 0.6, 
+                          marginTop: '4px',
+                          textAlign: isMine ? 'right' : 'left'
+                        }}>
+                          {new Date(message.created_at || message.createdAt).toLocaleTimeString('es-ES', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            second: '2-digit'
+                          })}
+                        </div>
                         
                         {/* Mostrar post compartido si existe */}
                         {message.shared_post && (
                           <div style={{
                             marginTop: '10px',
                             padding: '12px',
-                            border: '1px solid rgba(255,255,255,0.2)',
+                            border: isMine 
+                              ? '1px solid rgba(255,255,255,0.3)' 
+                              : '1px solid var(--border-color)',
                             borderRadius: '12px',
-                            background: 'rgba(255,255,255,0.1)',
+                            background: isMine 
+                              ? 'rgba(255,255,255,0.15)' 
+                              : 'var(--bg-hover)',
                             cursor: 'pointer',
-                            transition: 'transform 0.2s',
+                            transition: 'all 0.2s',
                           }}
                           onClick={() => {
                             const postId = typeof message.shared_post === 'object' ? message.shared_post._id : message.shared_post;
                             onClose(); // Cerrar el chat
                             navigate(`/p/${postId}`); // Navegar al post
                           }}
-                          onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
-                          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                          onMouseEnter={(e) => {
+                            e.target.style.transform = 'scale(1.02)';
+                            e.target.style.boxShadow = '0 4px 12px var(--shadow-color)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.transform = 'scale(1)';
+                            e.target.style.boxShadow = 'none';
+                          }}
                           >
-                            <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ 
+                              fontSize: '12px', 
+                              opacity: 0.9, 
+                              marginBottom: '8px', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '6px',
+                              fontWeight: '600'
+                            }}>
                               📎 Publicación compartida
                               {typeof message.shared_post === 'object' && message.shared_post.user && (
                                 <span>de @{message.shared_post.user.username || 'usuario'}</span>
@@ -443,21 +572,23 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
                             {typeof message.shared_post === 'object' && message.shared_post.text && (
                               <div style={{ 
                                 fontSize: '13px', 
-                                color: message.sender === currentUserId ? '#e1e1e1' : '#555',
+                                color: isMine ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)',
                                 marginBottom: '8px',
                                 fontStyle: 'italic',
                                 maxHeight: '60px',
                                 overflow: 'hidden',
-                                textOverflow: 'ellipsis'
+                                textOverflow: 'ellipsis',
+                                lineHeight: '1.4'
                               }}>
                                 "{message.shared_post.text.substring(0, 100)}{message.shared_post.text.length > 100 ? '...' : ''}"
                               </div>
                             )}
                             
                             <div style={{ 
-                              fontSize: '12px', 
-                              color: message.sender === currentUserId ? '#c1c1c1' : '#777',
-                              textAlign: 'center'
+                              fontSize: '11px', 
+                              color: isMine ? 'rgba(255,255,255,0.7)' : 'var(--text-tertiary)',
+                              textAlign: 'center',
+                              marginTop: '8px'
                             }}>
                               👆 Haz clic para ver la publicación completa
                             </div>
@@ -465,7 +596,9 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
                         )}
                       </div>
                     </div>
-                  ))
+                    );
+                    })}
+                  </>
                 )}
                 
                 {/* Typing Indicator */}
@@ -473,7 +606,7 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
                   <div style={{
                     padding: '10px 20px',
                     fontSize: '14px',
-                    color: '#8e8e8e',
+                    color: 'var(--text-secondary)',
                     fontStyle: 'italic',
                     display: 'flex',
                     alignItems: 'center',
@@ -487,25 +620,25 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
                         width: '8px',
                         height: '8px',
                         borderRadius: '50%',
-                        backgroundColor: '#8e8e8e',
+                        backgroundColor: 'var(--primary)',
                         animation: 'pulse 1.5s ease-in-out infinite'
                       }}></div>
                       <div style={{
                         width: '8px',
                         height: '8px',
                         borderRadius: '50%',
-                        backgroundColor: '#8e8e8e',
+                        backgroundColor: 'var(--primary)',
                         animation: 'pulse 1.5s ease-in-out infinite 0.2s'
                       }}></div>
                       <div style={{
                         width: '8px',
                         height: '8px',
                         borderRadius: '50%',
-                        backgroundColor: '#8e8e8e',
+                        backgroundColor: 'var(--primary)',
                         animation: 'pulse 1.5s ease-in-out infinite 0.4s'
                       }}></div>
                     </div>
-                    is typing...
+                    escribiendo...
                   </div>
                 )}
               </div>
@@ -513,23 +646,29 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
               {/* Send Message Form */}
               <form onSubmit={sendMessage} style={{
                 padding: '20px',
-                borderTop: '1px solid #e0e0e0',
+                borderTop: '1px solid var(--border-color)',
                 display: 'flex',
-                gap: '10px'
+                gap: '10px',
+                background: 'var(--bg-card)'
               }}>
                 <input
                   type="text"
                   value={newMessage}
                   onChange={handleMessageChange}
-                  placeholder="Type a message..."
+                  placeholder="Escribe un mensaje..."
                   style={{
                     flex: 1,
                     padding: '12px 16px',
-                    border: '1px solid #e0e0e0',
+                    border: '1px solid var(--input-border)',
                     borderRadius: '25px',
                     outline: 'none',
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    background: 'var(--input-bg)',
+                    color: 'var(--text-primary)',
+                    transition: 'border-color 0.2s'
                   }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--input-border)'}
                 />
                 <button
                   type="submit"
@@ -537,16 +676,26 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
                   style={{
                     background: newMessage.trim() 
                       ? 'linear-gradient(135deg, #A77693, #174871)' 
-                      : '#e0e0e0',
-                    color: newMessage.trim() ? 'white' : '#999',
+                      : 'var(--bg-tertiary)',
+                    color: newMessage.trim() ? 'white' : 'var(--text-secondary)',
                     border: 'none',
                     borderRadius: '25px',
-                    padding: '12px 20px',
+                    padding: '12px 24px',
                     cursor: newMessage.trim() ? 'pointer' : 'not-allowed',
-                    fontWeight: '600'
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                    boxShadow: newMessage.trim() ? '0 4px 12px var(--shadow-color)' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (newMessage.trim()) {
+                      e.target.style.transform = 'scale(1.05)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'scale(1)';
                   }}
                 >
-                  Send
+                  📤 Enviar
                 </button>
               </form>
             </>
@@ -554,11 +703,17 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
             <div style={{
               flex: 1,
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#8e8e8e'
+              color: 'var(--text-secondary)',
+              gap: '16px',
+              padding: '40px'
             }}>
-              Select a conversation to start chatting
+              <div style={{ fontSize: '48px' }}>💬</div>
+              <div style={{ fontSize: '16px', textAlign: 'center' }}>
+                Selecciona una conversación para comenzar a chatear
+              </div>
             </div>
           )}
         </div>

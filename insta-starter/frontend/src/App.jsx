@@ -12,11 +12,14 @@ import Register from './components/Register.jsx'
 import Login from './components/Login.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import FriendRequests from './components/FriendRequests.jsx'
-// Importaciones temporalmente comentadas para debug
-// import Sidebar from './components/Sidebar.jsx'
-// import ModernHeader from './components/ModernHeader.jsx'
+import Messages from './components/Messages.jsx'
+import UploadPost from './components/UploadPost.jsx'
+import UploadPostModal from './components/UploadPostModal.jsx'
+import ModernSidebar from './components/ModernSidebar.jsx'
+import ModernHeader from './components/ModernHeader.jsx'
 import { postJSON, postForm, STATIC } from './api'
 import './styles/instagram.css'
+import './styles/modern-theme.css'
 
 function DevLogin({ onLogin }){
   const [loading, setLoading] = useState(false)
@@ -130,100 +133,7 @@ function DevLogin({ onLogin }){
   )
 }
 
-function UploadPost(){
-  const [busy, setBusy] = useState(false)
-  const [fileLabel, setFileLabel] = useState('')
-  const [caption, setCaption] = useState('')
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [faceData, setFaceData] = useState([])
-  
-  const onChange = (e) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setFileLabel(file.name)
-      setSelectedFile(file)
-    } else {
-      setFileLabel('')
-      setSelectedFile(null)
-    }
-  }
-
-  const handleFacesDetected = (faces) => {
-    setFaceData(faces)
-    console.log('Faces detected:', faces)
-  }
-  
-  const submit = async (e)=>{
-    e.preventDefault()
-    setBusy(true)
-    const fd = new FormData(e.currentTarget)
-    
-    // Agregar datos de detección facial si están disponibles
-    if (faceData.length > 0) {
-      fd.append('face_data', JSON.stringify(faceData))
-    }
-    
-    await postForm('/uploads/local', fd).catch(()=>{})
-    setBusy(false)
-    if (e.currentTarget) {
-      e.currentTarget.reset()
-    }
-    setFileLabel('')
-    setCaption('')
-    setSelectedFile(null)
-    setFaceData([])
-    window.location.reload()
-  }
-
-  return (
-    <div className="upload-container">
-      <form onSubmit={submit} className="upload-form">
-        <div className="file-input-wrapper">
-          <input 
-            name="image" 
-            type="file" 
-            accept="image/*" 
-            required 
-            onChange={onChange}
-            className="file-input"
-            id="file-upload"
-          />
-          <label htmlFor="file-upload" className="file-input-label">
-            {fileLabel || 'Choose Photo'}
-          </label>
-        </div>
-        <textarea 
-          name="text" 
-          placeholder="Write a caption..." 
-          value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-          className="caption-input"
-        />
-        <button disabled={busy || !fileLabel} className="upload-btn">
-          {busy ? <span className="loading"></span> : 'Share'}
-        </button>
-      </form>
-      
-      {/* Face Detection Preview */}
-      {selectedFile && (
-        <div style={{ marginTop: '16px' }}>
-          <h4 style={{ marginBottom: '8px', fontSize: '14px', color: '#262626' }}>
-            Face Detection Preview:
-          </h4>
-          <FaceDetection 
-            imageFile={selectedFile} 
-            onFacesDetected={handleFacesDetected}
-          />
-          {faceData.length > 0 && (
-            <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-              Detected: {faceData.length} face{faceData.length !== 1 ? 's' : ''}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
+// UploadPost component moved to ./components/UploadPost.jsx with image filters support
 
 export default function App(){
   const [authed, setAuthed] = useState(!!localStorage.getItem('token'))
@@ -233,11 +143,17 @@ export default function App(){
   const [chatOpen, setChatOpen] = useState(false)
   const [chatTargetUser, setChatTargetUser] = useState(null)
   const [headerSearch, setHeaderSearch] = useState('')
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false) // Estado para el menú desplegable
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [uploadModalOpen, setUploadModalOpen] = useState(false)
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode')
+    return saved ? JSON.parse(saved) : false
+  })
   const navigate = useNavigate()
   const location = useLocation()
 
-  const API = import.meta.env.VITE_API || 'http://localhost:8080/api'
+  const API = import.meta.env.VITE_API || 'http://localhost:3001/api'
   
   // Hook para cargar notificaciones
   const loadNotifications = async () => {
@@ -294,6 +210,12 @@ export default function App(){
     }
   }, [authed, navigate])
 
+  // Aplicar tema oscuro/claro
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
+    localStorage.setItem('darkMode', JSON.stringify(darkMode))
+  }, [darkMode])
+
   // Cargar notificaciones
   useEffect(() => {
     if (authed) {
@@ -332,6 +254,9 @@ export default function App(){
       navigate(`/search?q=${encodeURIComponent(headerSearch.trim())}`);
     }
   }
+
+  const toggleSidebar = () => setSidebarCollapsed(!sidebarCollapsed)
+  const toggleTheme = () => setDarkMode(!darkMode)
 
   const handleAuthSuccess = (userData, token) => {
     setUser(userData)
@@ -398,414 +323,107 @@ export default function App(){
   }
 
   return (
-    <div style={{display: 'flex', minHeight: '100vh', background: 'linear-gradient(135deg, #F2F3F4 0%, #DED1C6 50%, #A77693 100%)'}}>
-      {/* Sidebar */}
-      <div style={{
-        width: '200px',
-        background: 'rgba(255,255,255,0.95)',
-        position: 'fixed',
-        height: '100vh',
-        left: 0,
-        top: 0,
-        zIndex: 1000,
-        padding: '1rem',
-        borderRight: '1px solid rgba(167,118,147,0.2)',
-        backdropFilter: 'blur(20px)',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        <h2 style={{color: '#174871', marginBottom: '2rem', fontSize: '1.5rem'}}>Red-O</h2>
-        
-        <nav style={{flex: 1}}>
-          <div style={{marginBottom: '1rem'}}>
-            <a href="/" style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.75rem',
-              textDecoration: 'none',
-              color: '#174871',
-              borderRadius: '12px',
-              transition: 'all 0.3s ease'
-            }}>
-              <span style={{fontSize: '1.2rem'}}>🏠</span>
-              Inicio
-            </a>
-          </div>
-          <div style={{marginBottom: '1rem'}}>
-            <a href="/search" style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.75rem',
-              textDecoration: 'none',
-              color: '#174871',
-              borderRadius: '12px',
-              transition: 'all 0.3s ease'
-            }}>
-              <span style={{fontSize: '1.2rem'}}>🔍</span>
-              Buscar
-            </a>
-          </div>
-          <div style={{marginBottom: '1rem'}}>
-            <a href="/search" style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.75rem',
-              textDecoration: 'none',
-              color: '#174871',
-              borderRadius: '12px',
-              transition: 'all 0.3s ease'
-            }}>
-              <span style={{fontSize: '1.2rem'}}>🔍✨</span>
-              Explorar
-            </a>
-          </div>
-          <div style={{marginBottom: '1rem'}}>
-            <a href="/notifications" style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.75rem',
-              textDecoration: 'none',
-              color: '#174871',
-              borderRadius: '12px',
-              transition: 'all 0.3s ease'
-            }}>
-              <span style={{fontSize: '1.2rem'}}>♡</span>
-              Notificaciones
-            </a>
-          </div>
-          <div style={{marginBottom: '1rem'}}>
-            <a href="/friends" style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.75rem',
-              textDecoration: 'none',
-              color: '#174871',
-              borderRadius: '12px',
-              transition: 'all 0.3s ease'
-            }}>
-              <span style={{fontSize: '1.2rem'}}>👥</span>
-              Amigos
-            </a>
-          </div>
-        </nav>
-        
-        <div style={{marginTop: 'auto', paddingTop: '2rem'}}>
-          <div style={{fontSize: '0.9rem', color: '#174871', marginBottom: '0.5rem'}}>
-            {user?.firstName} {user?.lastName}
-          </div>
-          <button onClick={logout} style={{
-            background: 'linear-gradient(135deg, #A77693, #174871)',
-            color: 'white',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '0.9rem'
-          }}>
-            Salir
-          </button>
-        </div>
-      </div>
+    <div className="gradient-bg" style={{display: 'flex', minHeight: '100vh'}}>
+      {/* Modern Sidebar */}
+      <ModernSidebar 
+        user={user}
+        isCollapsed={sidebarCollapsed}
+        onToggle={toggleSidebar}
+        onLogout={logout}
+        notificationCount={notificationCount}
+      />
+
       
       {/* Main Content */}
-      <div style={{
-        marginLeft: '200px', 
-        flex: 1, 
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {/* Header */}
-        <header style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(222, 209, 198, 0.3)',
-          padding: '1rem 2rem',
-          marginBottom: '2rem',
-          borderRadius: '0 0 20px 20px',
-          boxShadow: '0 4px 20px rgba(23, 72, 113, 0.1)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            maxWidth: '800px',
-            margin: '0 auto'
-          }}>
-            <form onSubmit={handleHeaderSearch} style={{flex: 1, maxWidth: '400px'}}>
-              <input 
-                type="text" 
-                value={headerSearch}
-                onChange={(e) => setHeaderSearch(e.target.value)}
-                placeholder="Buscar usuarios..." 
-                style={{
-                  width: '100%',
-                  padding: '12px 20px',
-                  background: 'rgba(242, 243, 244, 0.8)',
-                  border: '2px solid transparent',
-                  borderRadius: '25px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  transition: 'all 0.3s ease'
-                }}
-                onFocus={(e) => {
-                  e.target.style.background = 'rgba(255, 255, 255, 0.9)';
-                  e.target.style.borderColor = 'rgba(167, 118, 147, 0.5)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.background = 'rgba(242, 243, 244, 0.8)';
-                  e.target.style.borderColor = 'transparent';
-                }}
-              />
-            </form>
-            
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-              <Link to="/" style={{ textDecoration: 'none' }}>
-                <button style={{
-                  background: 'linear-gradient(135deg, #A77693, #174871)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'scale(1.05)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'scale(1)';
-                }}
-                >
-                  ✨ Crear
-                </button>
-              </Link>
-              
-              <Link to="/notifications" style={{ textDecoration: 'none' }}>
-                <button style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '20px',
-                  cursor: 'pointer',
-                  padding: '8px',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.background = 'rgba(167, 118, 147, 0.1)';
-                  e.target.style.borderRadius = '50%';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.background = 'none';
-                }}
-                >
-                  ♡
-                </button>
-              </Link>
-
-              <button 
-                onClick={() => setChatOpen(true)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '20px',
-                  cursor: 'pointer',
-                  padding: '8px',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.background = 'rgba(167, 118, 147, 0.1)';
-                  e.target.style.borderRadius = '50%';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.background = 'none';
-                }}
-              >
-                💬
-              </button>
-
-              <div style={{ position: 'relative' }} className="profile-menu-container">
-                <div 
-                  onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #174871, #0F2040)',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = 'scale(1.1)';
-                    e.target.style.boxShadow = '0 4px 12px rgba(167, 118, 147, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'scale(1)';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                >
-                  {user?.firstName?.charAt(0)?.toUpperCase() || user?.name?.charAt(0)?.toUpperCase() || 'U'}
-                </div>
-
-                {profileMenuOpen && (
-                  <div 
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      position: 'absolute',
-                      top: '40px',
-                      right: '0',
-                      backgroundColor: 'white',
-                      borderRadius: '12px',
-                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-                      border: '1px solid #e1e5e9',
-                      minWidth: '200px',
-                      zIndex: 9999,
-                      overflow: 'hidden'
-                    }}>
-                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #e1e5e9' }}>
-                      <div style={{ fontWeight: '600', fontSize: '14px', color: '#262626' }}>
-                        {user?.firstName || user?.name || 'Usuario'}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#8e8e8e' }}>
-                        @{user?.username || 'unknown'}
-                      </div>
-                    </div>
-                    
-                    <div 
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        navigate(`/users/${user?.username || 'unknown'}`);
-                      }}
-                      style={{
-                        display: 'block',
-                        padding: '12px 16px',
-                        color: '#262626',
-                        fontSize: '14px',
-                        borderBottom: '1px solid #e1e5e9',
-                        transition: 'background-color 0.2s ease',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f7f7f7'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      👤 Ver perfil
-                    </div>
-                    
-                    <div 
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        navigate('/settings');
-                      }}
-                      style={{
-                        display: 'block',
-                        padding: '12px 16px',
-                        color: '#262626',
-                        fontSize: '14px',
-                        borderBottom: '1px solid #e1e5e9',
-                        transition: 'background-color 0.2s ease',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f7f7f7'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      ⚙️ Configuración
-                    </div>
-                    
-                    <div
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        logout();
-                      }}
-                      style={{
-                        padding: '12px 16px',
-                        color: '#ed4956',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#fef7f7'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      🚪 Cerrar sesión
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
+      <div 
+        className="animate-slide-left"
+        style={{
+          marginLeft: sidebarCollapsed ? '80px' : '260px',
+          flex: 1,
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'margin-left var(--transition-medium)'
+        }}
+      >
+        {/* Modern Header */}
+        <ModernHeader 
+          user={user}
+          searchValue={headerSearch}
+          onSearchChange={(e) => setHeaderSearch(e.target.value)}
+          onSearchSubmit={handleHeaderSearch}
+          notificationCount={notificationCount}
+          darkMode={darkMode}
+          onToggleTheme={toggleTheme}
+          onOpenUploadModal={() => setUploadModalOpen(true)}
+          onOpenChat={() => setChatOpen(true)}
+          onLogout={logout}
+        />
         
         {/* Content Area */}
-        <main style={{
-          maxWidth: location.pathname === '/search' ? '100%' : '600px',
-          margin: '0 auto',
-          padding: location.pathname === '/search' ? '0 1rem 2rem' : '0 2rem 2rem',
-          flex: 1,
-          minHeight: '0' // Permite que el main se adapte al espacio disponible
-        }}>
+        <main 
+          className="animate-fade-in"
+          style={{
+            maxWidth: location.pathname === '/search' ? '100%' : '900px',
+            margin: '0 auto',
+            padding: location.pathname === '/search' ? '1rem' : '2rem',
+            flex: 1,
+            minHeight: '0',
+            width: '100%'
+          }}
+        >
           <Routes>
             <Route path="/" element={
-              <div>
-                <UploadPost />
+              <div className="animate-fade-in-scale">
                 <Feed />
               </div>
             } />
-            <Route path="/users/:username" element={<UserProfile currentUser={user} openChat={openChatWithUser} />} />
+            <Route path="/u/:username" element={<UserProfile currentUser={user} openChat={openChatWithUser} />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/messages" element={<Messages />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/friends" element={<FriendRequests />} />
             <Route path="/p/:id" element={<PostView />} />
           </Routes>
         </main>
         
-        {/* Footer - Ahora queda fijo en la parte inferior */}
-        <footer style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          borderTop: '1px solid rgba(222, 209, 198, 0.3)',
-          padding: '1rem 2rem',
-          borderRadius: '20px 20px 0 0',
-          boxShadow: '0 -4px 20px rgba(23, 72, 113, 0.1)',
-          marginTop: 'auto',
-          flexShrink: 0 // Evita que el footer se comprima
-        }}>
+        {/* Modern Footer */}
+        <footer 
+          className="glass-effect"
+          style={{
+            borderTop: '1px solid var(--border-color)',
+            padding: '1.5rem 2rem',
+            marginTop: 'auto',
+            flexShrink: 0
+          }}
+        >
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            maxWidth: '800px',
+            maxWidth: '900px',
             margin: '0 auto',
-            fontSize: '0.9rem',
-            color: '#174871'
+            fontSize: '0.875rem',
+            color: 'var(--text-secondary)'
           }}>
-            <div style={{display: 'flex', gap: '1rem'}}>
-              <a href="/" style={{color: '#A77693', textDecoration: 'none'}}>Inicio</a>
-              <a href="/search" style={{color: '#A77693', textDecoration: 'none'}}>Explorar</a>
-              <a href="/notifications" style={{color: '#A77693', textDecoration: 'none'}}>Actividad</a>
-              <a href="/settings" style={{color: '#A77693', textDecoration: 'none'}}>Ajustes</a>
+            <div style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap'}}>
+              <Link to="/" style={{color: 'var(--primary)', textDecoration: 'none', fontWeight: '500'}}>Inicio</Link>
+              <Link to="/search" style={{color: 'var(--primary)', textDecoration: 'none', fontWeight: '500'}}>Explorar</Link>
+              <Link to="/notifications" style={{color: 'var(--primary)', textDecoration: 'none', fontWeight: '500'}}>Actividad</Link>
+              <Link to="/settings" style={{color: 'var(--primary)', textDecoration: 'none', fontWeight: '500'}}>Ajustes</Link>
             </div>
             
             <div style={{
-              fontSize: '0.8rem',
-              color: '#174871',
-              opacity: 0.7
+              fontSize: '0.75rem',
+              opacity: 0.7,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
             }}>
-              © 2025 Red-O - Social Network
+              <span>© 2025 Red-O</span>
+              <span>•</span>
+              <span>Social Network</span>
             </div>
           </div>
         </footer>
@@ -819,6 +437,12 @@ export default function App(){
           setChatTargetUser(null)
         }}
         targetUser={chatTargetUser}
+      />
+      
+      {/* Upload Post Modal */}
+      <UploadPostModal 
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
       />
     </div>
   )

@@ -38,22 +38,73 @@ export default function Notifications(){
   const unread = items.filter(n=>!n.is_read).length;
 
   return (
-    <div style={{maxWidth:800, margin:'0 auto', fontFamily:'system-ui', padding:16}}>
-      <header style={{display:'flex', alignItems:'center', gap:12, marginBottom:12}}>
-        <h2 style={{margin:0}}>Notificaciones</h2>
-        <span style={{color:'#666'}}>{unread} sin leer</span>
+    <div style={{
+      maxWidth:800, 
+      margin:'0 auto', 
+      fontFamily:'system-ui', 
+      padding:16
+    }}>
+      <header style={{
+        display:'flex', 
+        alignItems:'center', 
+        gap:12, 
+        marginBottom:12,
+        padding: '1rem',
+        background: 'var(--bg-card)',
+        borderRadius: '12px',
+        border: '1px solid var(--border-color)'
+      }}>
+        <h2 style={{margin:0, color: 'var(--text-primary)'}}>Notificaciones</h2>
+        <span style={{color:'var(--text-secondary)'}}>{unread} sin leer</span>
         <span style={{marginLeft:'auto'}}>
-          <button onClick={markAll} disabled={marking || unread===0}>{marking ? 'Marcando…' : 'Marcar todas como leídas'}</button>
+          <button 
+            onClick={markAll} 
+            disabled={marking || unread===0}
+            style={{
+              padding: '0.5rem 1rem',
+              background: marking || unread===0 ? 'var(--bg-tertiary)' : 'var(--gradient-primary)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: marking || unread===0 ? 'not-allowed' : 'pointer',
+              fontWeight: '600',
+              fontSize: '14px'
+            }}
+          >
+            {marking ? 'Marcando…' : 'Marcar todas como leídas'}
+          </button>
         </span>
       </header>
-      {!items.length ? <p>No tienes notificaciones aún.</p> : (
+      {!items.length ? (
+        <p style={{
+          textAlign: 'center',
+          padding: '3rem',
+          color: 'var(--text-secondary)',
+          background: 'var(--bg-card)',
+          borderRadius: '12px',
+          border: '1px solid var(--border-color)'
+        }}>
+          No tienes notificaciones aún.
+        </p>
+      ) : (
         <ul style={{listStyle:'none', padding:0, margin:0, display:'grid', gap:8}}>
           {items.map(n => (
-            <li key={n._id} style={{padding:'10px 12px', borderRadius:8, background:n.is_read?'#f6f7f8':'#eaf3ff', border:'1px solid #e3e7ee'}}>
-              <div style={{fontSize:12, color:'#666'}}>{new Date(n.created_at).toLocaleString()}</div>
-              <div>
+            <li 
+              key={n._id} 
+              style={{
+                padding:'12px 16px', 
+                borderRadius:12, 
+                background: n.is_read ? 'var(--bg-secondary)' : 'rgba(102, 126, 234, 0.1)', 
+                border: `1px solid ${n.is_read ? 'var(--border-color)' : 'rgba(102, 126, 234, 0.3)'}`,
+                transition: 'all 0.2s'
+              }}
+            >
+              <div style={{fontSize:12, color:'var(--text-secondary)', marginBottom: '4px'}}>
+                {new Date(n.created_at).toLocaleString()}
+              </div>
+              <div style={{color: 'var(--text-primary)'}}>
                 <strong>{n.kind}</strong>: {KIND_LABEL[n.kind] || 'actividad'}.
-                {n.entity==='post' && n.entity_id && <> Ver <Link to={`/p/${n.entity_id}`}>publicación</Link>.</>}
+                {n.entity==='post' && n.entity_id && <> Ver <Link to={`/p/${n.entity_id}`} style={{color: 'var(--primary)'}}>publicación</Link>.</>}
               </div>
             </li>
           ))}

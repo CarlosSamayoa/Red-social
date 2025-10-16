@@ -183,7 +183,7 @@ router.get('/google', (req, res) => {
   const authUrl = googleClient.generateAuthUrl({
     access_type: 'offline',
     scope: ['profile', 'email'],
-    redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:8080/api/auth/google/callback'
+     redirect_uri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/api/auth/google/callback'
   });
   res.redirect(authUrl);
 });

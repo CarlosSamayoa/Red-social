@@ -160,9 +160,9 @@ export default function Settings() {
       maxWidth: '800px',
       margin: '0 auto',
       padding: '20px',
-      background: 'rgba(255, 255, 255, 0.95)',
+      background: 'var(--bg-card)',
       borderRadius: '20px',
-      boxShadow: '0 8px 32px rgba(23, 72, 113, 0.1)'
+      boxShadow: '0 8px 32px var(--shadow-color)'
     }}>
       {/* Header */}
       <div style={{
@@ -492,12 +492,12 @@ export default function Settings() {
             {/* Error/Success Messages */}
             {passwordError && (
               <div style={{
-                background: '#ffebee',
-                color: '#c62828',
+                background: 'var(--bg-error, rgba(220, 38, 38, 0.1))',
+                color: 'var(--text-error, #ef4444)',
                 padding: '12px',
                 borderRadius: '8px',
                 marginBottom: '20px',
-                border: '1px solid #ffcdd2'
+                border: '1px solid var(--border-error, rgba(220, 38, 38, 0.3))'
               }}>
                 ❌ {passwordError}
               </div>
@@ -505,12 +505,12 @@ export default function Settings() {
 
             {passwordSuccess && (
               <div style={{
-                background: '#e8f5e8',
-                color: '#2e7d32',
+                background: 'var(--bg-success, rgba(34, 197, 94, 0.1))',
+                color: 'var(--text-success, #22c55e)',
                 padding: '12px',
                 borderRadius: '8px',
                 marginBottom: '20px',
-                border: '1px solid #c8e6c9'
+                border: '1px solid var(--border-success, rgba(34, 197, 94, 0.3))'
               }}>
                 ✅ {passwordSuccess}
               </div>

@@ -507,14 +507,14 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
-                    background: '#fff',
-                    color: '#23243a',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
                     fontWeight: 600,
                     fontSize: '1rem',
                     borderRadius: 8,
                     padding: '0.8rem 0',
                     textDecoration: 'none',
-                    border: '1px solid #3a3a4f',
+                    border: '1px solid var(--border-color)',
                   }}
                 >
                   <img

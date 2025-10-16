@@ -1,0 +1,820 @@
+/* ============================================
+   MODERN THEME - Dark/Light Mode System
+   ============================================ */
+
+:root {
+  /* Light Mode Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --bg-card: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.05);
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-tertiary: #adb5bd;
+  --border-color: rgba(0, 0, 0, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --overlay-bg: rgba(255, 255, 255, 0.95);
+  --input-bg: #ffffff;
+  --input-border: rgba(0, 0, 0, 0.2);
+  
+  /* Brand Colors */
+  --primary: #A77693;
+  --secondary: #174871;
+  --accent: #DED1C6;
+  --light: #F2F3F4;
+  --success: #28a745;
+  --danger: #dc3545;
+  --warning: #ffc107;
+  --info: #17a2b8;
+  
+  /* Message States (Light Mode) */
+  --bg-error: rgba(220, 38, 38, 0.1);
+  --text-error: #dc2626;
+  --border-error: rgba(220, 38, 38, 0.3);
+  --bg-success: rgba(34, 197, 94, 0.1);
+  --text-success: #22c55e;
+  --border-success: rgba(34, 197, 94, 0.3);
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #A77693 0%, #174871 100%);
+  --gradient-secondary: linear-gradient(135deg, #DED1C6 0%, #A77693 100%);
+  --gradient-hero: linear-gradient(135deg, #F2F3F4 0%, #DED1C6 50%, #A77693 100%);
+  --gradient-vibrant: linear-gradient(135deg, #8B5CF6 0%, #EC4899 50%, #F59E0B 100%);
+  
+  /* Animations */
+  --transition-fast: 0.2s ease;
+  --transition-medium: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  
+  /* Spacing */
+  --sidebar-width: 260px;
+  --sidebar-collapsed: 80px;
+  --header-height: 70px;
+  
+  /* Effects */
+  --blur-sm: blur(10px);
+  --blur-md: blur(20px);
+  --blur-lg: blur(30px);
+}
+
+[data-theme="dark"] {
+  /* Dark Mode Colors - Equilibrio entre oscuro y vibrante */
+  --bg-primary: #0d0d0d;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #2a2a2a;
+  --bg-card: #161616;
+  --bg-hover: rgba(255, 255, 255, 0.1);
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-tertiary: #999999;
+  --border-color: rgba(255, 255, 255, 0.12);
+  --shadow-color: rgba(0, 0, 0, 0.9);
+  --overlay-bg: rgba(13, 13, 13, 0.98);
+  --input-bg: #1a1a1a;
+  --input-border: rgba(255, 255, 255, 0.25);
+  
+  /* Colores más vibrantes para modo oscuro */
+  --primary: #c98ba9;
+  --secondary: #2a7aaf;
+  --accent: #e8d9ce;
+  
+  /* Message States (Dark Mode) */
+  --bg-error: rgba(239, 68, 68, 0.15);
+  --text-error: #ef4444;
+  --border-error: rgba(239, 68, 68, 0.4);
+  --bg-success: rgba(34, 197, 94, 0.15);
+  --text-success: #4ade80;
+  --border-success: rgba(34, 197, 94, 0.4);
+  
+  /* Ajustar gradientes para modo oscuro */
+  --gradient-primary: linear-gradient(135deg, #c98ba9 0%, #2a7aaf 100%);
+  --gradient-secondary: linear-gradient(135deg, #e8d9ce 0%, #c98ba9 100%);
+  --gradient-hero: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 50%, #2a2a2a 100%);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background var(--transition-medium), color var(--transition-medium);
+}
+
+/* ============================================
+   ANIMATIONS & KEYFRAMES
+   ============================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 0.4s ease-out;
+}
+
+.animate-slide-right {
+  animation: slideInRight 0.4s ease-out;
+}
+
+.animate-slide-left {
+  animation: slideInLeft 0.4s ease-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.gradient-bg {
+  background: var(--gradient-hero);
+  background-size: 200% 200%;
+  animation: gradientShift 10s ease infinite;
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .glass-effect {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hover-lift {
+  transition: transform var(--transition-medium), box-shadow var(--transition-medium);
+}
+
+.hover-lift:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px var(--shadow-color);
+}
+
+.hover-glow {
+  transition: all var(--transition-medium);
+  position: relative;
+}
+
+.hover-glow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity var(--transition-medium);
+  z-index: -1;
+  filter: blur(20px);
+}
+
+.hover-glow:hover::before {
+  opacity: 0.5;
+}
+
+/* ============================================
+   SCROLLBAR CUSTOM
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 100%;
+    --sidebar-collapsed: 100%;
+  }
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 0%,
+    var(--bg-secondary) 50%,
+    var(--bg-tertiary) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   FORMS & INPUTS - Modo Oscuro Compatible
+   ============================================ */
+
+input, textarea, select {
+  background: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--input-border) !important;
+  transition: all var(--transition-medium);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-tertiary) !important;
+  opacity: 0.7;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(167, 118, 147, 0.1) !important;
+}
+
+/* ============================================
+   BUTTONS - Modo Oscuro Compatible
+   ============================================ */
+
+button {
+  color: var(--text-primary);
+  transition: all var(--transition-medium);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   CARDS - Modo Oscuro Compatible
+   ============================================ */
+
+.card, .post, .publication {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 2px 12px var(--shadow-color) !important;
+  transition: all var(--transition-medium) !important;
+}
+
+.card:hover, .post:hover {
+  box-shadow: 0 8px 24px var(--shadow-color) !important;
+  transform: translateY(-2px);
+}
+
+/* ============================================
+   TEXT - Modo Oscuro Compatible
+   ============================================ */
+
+h1, h2, h3, h4, h5, h6, p, span, a, label {
+  color: var(--text-primary);
+  transition: color var(--transition-medium);
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.text-tertiary {
+  color: var(--text-tertiary) !important;
+}
+
+/* ============================================
+   MODALS & OVERLAYS - Modo Oscuro Compatible
+   ============================================ */
+
+.modal, .overlay, .popup {
+  background: var(--overlay-bg) !important;
+  backdrop-filter: var(--blur-md);
+}
+
+.modal-content {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ============================================
+   LISTS - Modo Oscuro Compatible
+   ============================================ */
+
+ul, ol, li {
+  color: var(--text-primary);
+}
+
+/* ============================================
+   LINKS - Modo Oscuro Compatible
+   ============================================ */
+
+a {
+  color: var(--primary);
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--secondary);
+}
+
+/* ============================================
+   BORDERS & DIVIDERS - Modo Oscuro Compatible
+   ============================================ */
+
+hr {
+  border-color: var(--border-color) !important;
+  opacity: 1 !important;
+}
+
+/* ============================================
+   NAVIGATION - Modo Oscuro Compatible
+   ============================================ */
+
+nav, header, footer {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+/* ============================================
+   ESPECÍFICOS DEL FEED
+   ============================================ */
+
+.feed-container {
+  background: var(--bg-primary);
+}
+
+.post-header, .user-info {
+  color: var(--text-primary) !important;
+}
+
+.post-caption, .comment-text {
+  color: var(--text-primary) !important;
+}
+
+.post-meta, .timestamp {
+  color: var(--text-secondary) !important;
+}
+
+/* ============================================
+   PROFILE - Modo Oscuro Compatible
+   ============================================ */
+
+.profile-header {
+  background: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.profile-stats {
+  color: var(--text-primary) !important;
+}
+
+.profile-bio {
+  color: var(--text-secondary) !important;
+}
+
+/* ============================================
+   NOTIFICATIONS - Modo Oscuro Compatible
+   ============================================ */
+
+.notification-item {
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.notification-item:hover {
+  background: var(--bg-hover) !important;
+}
+
+.notification-unread {
+  background: var(--bg-secondary) !important;
+}
+
+/* ============================================
+   SEARCH - Modo Oscuro Compatible
+   ============================================ */
+
+.search-container {
+  background: var(--bg-primary);
+}
+
+.search-result {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.search-result:hover {
+  background: var(--bg-hover) !important;
+}
+
+/* ============================================
+   MESSAGES/CHAT - Modo Oscuro Compatible
+   ============================================ */
+
+.chat-window {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.message-bubble {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.message-input {
+  background: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--input-border) !important;
+}
+
+/* ============================================
+   FORCE DARK MODE - Reglas agresivas
+   ============================================ */
+
+[data-theme="dark"] * {
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .upload-container,
+[data-theme="dark"] .upload-form,
+[data-theme="dark"] .file-input-wrapper,
+[data-theme="dark"] .file-input-label,
+[data-theme="dark"] .caption-input,
+[data-theme="dark"] .upload-btn {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .login-container,
+[data-theme="dark"] .login-box,
+[data-theme="dark"] .login-form {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .login-input,
+[data-theme="dark"] .login-button {
+  background: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--input-border) !important;
+}
+
+[data-theme="dark"] .login-logo {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .sidebar,
+[data-theme="dark"] .sidebar-nav-link {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .publication,
+[data-theme="dark"] .post-card,
+[data-theme="dark"] .user-card {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .publication img,
+[data-theme="dark"] .post-card img {
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .post-actions,
+[data-theme="dark"] .post-comments,
+[data-theme="dark"] .comment {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .like-btn,
+[data-theme="dark"] .comment-btn,
+[data-theme="dark"] .share-btn {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .like-btn:hover,
+[data-theme="dark"] .comment-btn:hover,
+[data-theme="dark"] .share-btn:hover {
+  color: var(--primary) !important;
+}
+
+[data-theme="dark"] .username,
+[data-theme="dark"] .user-name,
+[data-theme="dark"] .post-caption,
+[data-theme="dark"] .comment-text,
+[data-theme="dark"] .timestamp {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .post-meta,
+[data-theme="dark"] .post-date,
+[data-theme="dark"] .comment-date {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .settings-container,
+[data-theme="dark"] .settings-section,
+[data-theme="dark"] .settings-item {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .friend-request,
+[data-theme="dark"] .friend-request-card {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] select,
+[data-theme="dark"] option {
+  background: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Labels y descripciones */
+[data-theme="dark"] label,
+[data-theme="dark"] .form-label,
+[data-theme="dark"] .input-label {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .description,
+[data-theme="dark"] .help-text,
+[data-theme="dark"] .hint {
+  color: var(--text-secondary) !important;
+}
+
+/* Tablas */
+[data-theme="dark"] table {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] th,
+[data-theme="dark"] td {
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] thead {
+  background: var(--bg-secondary) !important;
+}
+
+/* Avatares y círculos */
+[data-theme="dark"] .avatar {
+  border-color: var(--border-color) !important;
+}
+
+/* Code blocks */
+[data-theme="dark"] code,
+[data-theme="dark"] pre {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Badges y pills */
+[data-theme="dark"] .badge,
+[data-theme="dark"] .pill,
+[data-theme="dark"] .tag {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Loading states */
+[data-theme="dark"] .loading,
+[data-theme="dark"] .spinner {
+  border-color: var(--border-color) !important;
+  border-top-color: var(--primary) !important;
+}
+
+/* Tooltips */
+[data-theme="dark"] .tooltip {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Dropdowns */
+[data-theme="dark"] .dropdown-menu,
+[data-theme="dark"] .dropdown-item {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+  background: var(--bg-hover) !important;
+}
+
+/* ============================================
+   Friend Requests - Dark Mode
+   ============================================ */
+[data-theme="dark"] .friend-requests-container {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .friend-requests-header h2 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .tab-button {
+  color: var(--text-secondary) !important;
+  border-bottom-color: transparent !important;
+}
+
+[data-theme="dark"] .tab-button:hover {
+  color: var(--text-primary) !important;
+  background: var(--bg-hover) !important;
+}
+
+[data-theme="dark"] .tab-button.active {
+  color: var(--primary) !important;
+  border-bottom-color: var(--primary) !important;
+  background: var(--bg-secondary) !important;
+}
+
+[data-theme="dark"] .request-item,
+[data-theme="dark"] .friend-item {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .request-item:hover,
+[data-theme="dark"] .friend-item:hover {
+  box-shadow: 0 4px 12px var(--shadow-color) !important;
+}
+
+[data-theme="dark"] .username {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .full-name {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .request-time,
+[data-theme="dark"] .request-status {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .pending-status {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .empty-state {
+  color: var(--text-secondary) !important;
+  background: var(--bg-secondary) !important;
+  border-radius: 12px;
+  border: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .friend-requests-loading {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .friend-tabs {
+  border-bottom-color: var(--border-color) !important;
+}
+

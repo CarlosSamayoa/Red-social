@@ -59,6 +59,7 @@ router.get('/search/posts', requireAuth, [ query('q').optional().isString().trim
         .limit(limit).lean();
     }
     
+    // ✅ Los posts ya incluyen el campo media por usar .lean() sin projection
     res.json({ posts: list });
   }catch(e){ next(e); }
 });
@@ -137,6 +138,7 @@ router.get('/explore/infinite', requireAuth, [
               text: 1,
               location: 1,
               file: 1,
+              media: 1,
               created_at: 1,
               engagementScore: 1
             }
@@ -174,6 +176,7 @@ router.get('/explore/infinite', requireAuth, [
               text: 1,
               location: 1,
               file: 1,
+              media: 1,
               created_at: 1
             }
           }
@@ -240,6 +243,7 @@ router.get('/explore/infinite', requireAuth, [
               text: 1,
               location: 1,
               file: 1,
+              media: 1,
               created_at: 1
             }
           }
@@ -264,19 +268,30 @@ router.get('/explore/infinite', requireAuth, [
               text: 1,
               location: 1,
               file: 1,
+              media: 1,
               created_at: 1
             }
           }
         ]);
 
-        // Mezclar resultados de manera inteligente
+        // Mezclar resultados de manera inteligente evitando duplicados
+        const seenIds = new Set();
         const mixedPosts = [];
         const maxLength = Math.max(recentPosts.docs.length, trendingResults.length, randomResults.length);
         
         for (let i = 0; i < maxLength; i++) {
-          if (recentPosts.docs[i]) mixedPosts.push({ ...recentPosts.docs[i], source: 'recent' });
-          if (trendingResults[i]) mixedPosts.push({ ...trendingResults[i], source: 'trending' });
-          if (randomResults[i]) mixedPosts.push({ ...randomResults[i], source: 'random' });
+          if (recentPosts.docs[i] && !seenIds.has(String(recentPosts.docs[i]._id))) {
+            mixedPosts.push({ ...recentPosts.docs[i], source: 'recent' });
+            seenIds.add(String(recentPosts.docs[i]._id));
+          }
+          if (trendingResults[i] && !seenIds.has(String(trendingResults[i]._id))) {
+            mixedPosts.push({ ...trendingResults[i], source: 'trending' });
+            seenIds.add(String(trendingResults[i]._id));
+          }
+          if (randomResults[i] && !seenIds.has(String(randomResults[i]._id))) {
+            mixedPosts.push({ ...randomResults[i], source: 'random' });
+            seenIds.add(String(randomResults[i]._id));
+          }
         }
 
         return res.json({

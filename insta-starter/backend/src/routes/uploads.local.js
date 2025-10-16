@@ -226,6 +226,7 @@ router.post('/uploads/local', requireAuth, upload.single('image'), async (req, r
     const publication = await Publication.create({
       user: userId,
       text: req.body.text || '',
+      filter: req.body.filter || 'original', // Guardar el filtro CSS aplicado
       file: {
         s3_key_original: relativeOriginalPath,
         mime,
@@ -318,6 +319,184 @@ router.get('/transformations/info', requireAuth, (req, res) => {
     automatic_processing: true,
     max_file_size: '10MB',
     supported_formats: ['JPEG', 'PNG', 'WebP', 'GIF']
+  });
+});
+
+// Endpoint para múltiples archivos (imágenes y videos)
+router.post('/uploads/local-multiple', requireAuth, multer({ 
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = originals(req.user.id);
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const timestamp = Date.now();
+      const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+      const filename = `${timestamp}_${crypto.randomBytes(8).toString('hex')}${ext}`;
+      cb(null, filename);
+    }
+  }),
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB máximo para videos
+    files: 10 // Máximo 10 archivos
+  },
+  fileFilter: (req, file, cb) => {
+    // Validar imágenes y videos
+    const allowedTypes = /^(image|video)\/(jpeg|jpg|png|webp|gif|mp4|mov|avi|webm)$/i;
+    const isValidType = allowedTypes.test(file.mimetype);
+    
+    const allowedExts = /\.(jpg|jpeg|png|webp|gif|mp4|mov|avi|webm)$/i;
+    const isValidExt = allowedExts.test(file.originalname);
+    
+    if (isValidType && isValidExt) {
+      cb(null, true);
+    } else {
+      cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'Solo imágenes (JPG, PNG, WebP, GIF) y videos (MP4, MOV, AVI, WebM)'), false);
+    }
+  }
+}).array('files', 10), async (req, res) => {
+  try {
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'No se subieron archivos' });
+    }
+
+    const { caption = '', filters = '[]' } = req.body;
+    const filtersArray = JSON.parse(filters);
+    const uid = req.user.id;
+
+    const mediaItems = [];
+
+    // Procesar cada archivo
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const filter = filtersArray[i] || 'original';
+      const isVideo = file.mimetype.startsWith('video/');
+
+      console.log(`📁 Processing file ${i + 1}/${files.length}:`, {
+        filename: file.filename,
+        mimetype: file.mimetype,
+        size: file.size,
+        filter,
+        isVideo
+      });
+
+      const mediaItem = {
+        s3_key_original: `originals/${uid}/${file.filename}`,
+        mime: file.mimetype,
+        size_bytes: file.size,
+        filter: isVideo ? 'none' : filter,
+        media_type: isVideo ? 'video' : 'image',
+        variants: []
+      };
+
+      // Si es imagen, generar variantes
+      if (!isVideo) {
+        const originalPath = file.path;
+        const fileName = file.filename;
+
+        try {
+          const metadata = await sharp(originalPath).metadata();
+          mediaItem.width = metadata.width;
+          mediaItem.height = metadata.height;
+
+          // Generar variantes
+          const transformations = [
+            { kind: 'thumb', op: (s) => s.resize(150, 150, { fit: 'cover', position: 'center' }) },
+            { kind: 'small', op: (s) => s.resize(300, null, { fit: 'inside', withoutEnlargement: true }) },
+            { kind: 'medium', op: (s) => s.resize(800, null, { fit: 'inside', withoutEnlargement: true }) },
+            { kind: 'large', op: (s) => s.resize(1200, null, { fit: 'inside', withoutEnlargement: true }) }
+          ];
+
+          for (const transform of transformations) {
+            try {
+              const vdir = variants(transform.kind, uid);
+              fs.mkdirSync(vdir, { recursive: true });
+              const outputPath = path.join(vdir, fileName);
+
+              const processedImage = await transform.op(sharp(originalPath))
+                .jpeg({ quality: 85, mozjpeg: true })
+                .toFile(outputPath);
+
+              mediaItem.variants.push({
+                kind: transform.kind,
+                s3_key: `variants/${transform.kind}/${uid}/${fileName}`,
+                width: processedImage.width,
+                height: processedImage.height
+              });
+            } catch (err) {
+              console.error(`Error generating ${transform.kind}:`, err);
+            }
+          }
+        } catch (err) {
+          console.error('❌ Error processing image:', err);
+        }
+      }
+
+      console.log(`✅ Media item processed:`, {
+        s3_key_original: mediaItem.s3_key_original,
+        variants_count: mediaItem.variants.length,
+        media_type: mediaItem.media_type,
+        filter: mediaItem.filter
+      });
+
+      mediaItems.push(mediaItem);
+    }
+
+    // Crear publicación con múltiples medios
+    const pub = await Publication.create({
+      user: uid,
+      text: caption,
+      media: mediaItems
+    });
+
+    await pub.populate('user', 'username name');
+    
+    console.log('✅ Publication created:', {
+      id: pub._id,
+      user: pub.user,
+      mediaCount: mediaItems.length,
+      text: caption
+    });
+    
+    res.json({ ok: true, publication: pub });
+
+  } catch (err) {
+    console.error('❌ Upload error:', err);
+    res.status(500).json({ error: err.message || 'Error al subir archivos' });
+  }
+}, (error, req, res, next) => {
+  // Middleware de manejo de errores de Multer
+  console.error('❌ Multer error:', error);
+  
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        error: 'Archivo demasiado grande. Máximo 50MB por archivo.',
+        code: 'FILE_TOO_LARGE'
+      });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ 
+        error: 'Demasiados archivos. Máximo 10 archivos.',
+        code: 'TOO_MANY_FILES'
+      });
+    }
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ 
+        error: 'Campo de archivo inesperado o tipo no permitido.',
+        code: 'INVALID_FILE_TYPE'
+      });
+    }
+    return res.status(400).json({ 
+      error: error.message,
+      code: error.code
+    });
+  }
+  
+  return res.status(500).json({ 
+    error: error.message || 'Error al procesar los archivos'
   });
 });
 

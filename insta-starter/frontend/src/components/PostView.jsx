@@ -1,9 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getJSON, postJSON, STATIC } from '../api';
+import { getJSON, postJSON, STATIC, API } from '../api';
+import MediaCarousel from './MediaCarousel.jsx';
+
+// Mapa de filtros CSS
+const IMAGE_FILTERS = {
+  original: 'none',
+  grayscale: 'grayscale(100%)',
+  sepia: 'sepia(100%)',
+  vintage: 'sepia(50%) contrast(120%) brightness(90%)',
+  cool: 'saturate(120%) hue-rotate(20deg)',
+  warm: 'saturate(130%) hue-rotate(-20deg) brightness(110%)',
+  contrast: 'contrast(150%) brightness(105%)',
+  bright: 'brightness(130%) saturate(110%)',
+  soft: 'blur(1px) brightness(110%)',
+  dramatic: 'contrast(160%) saturate(80%)'
+};
 
 export default function PostView(){
-  const me = (()=>{ try { return JSON.parse(localStorage.getItem('me')||'{}'); } catch { return {}; } })();
+  // usar clave uniforme 'user'
+  const me = (()=>{ try { return JSON.parse(localStorage.getItem('user')||'{}'); } catch { return {}; } })();
   const { id } = useParams();
   const [post, setPost] = useState(null);
   const [error, setError] = useState('');
@@ -13,6 +29,10 @@ export default function PostView(){
   const [busyComment, setBusyComment] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState('original');
   const [showAllVariants, setShowAllVariants] = useState(false);
+  
+  // Determinar si el post tiene múltiples medios o formato legacy
+  const hasMultipleMedia = post && post.media && post.media.length > 0;
+  const mediaCount = hasMultipleMedia ? post.media.length : (post && post.file ? 1 : 0);
 
   async function refresh(){
     const [p, l, c] = await Promise.all([
@@ -32,10 +52,10 @@ export default function PostView(){
     setBusyLike(true);
     try{
       if(likes.liked){
-        await fetch(`${import.meta.env.VITE_API || 'http://localhost:8080/api'}/posts/${id}/like`, { method:'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }});
+        await fetch(`${API}/posts/${id}/like`, { method:'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }});
         setLikes(v => ({ count: Math.max(0, v.count-1), liked: false }));
       } else {
-        await fetch(`${import.meta.env.VITE_API || 'http://localhost:8080/api'}/posts/${id}/like`, { method:'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }});
+        await fetch(`${API}/posts/${id}/like`, { method:'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }});
         setLikes(v => ({ count: v.count+1, liked: true }));
       }
     } finally { setBusyLike(false); }
@@ -64,7 +84,7 @@ export default function PostView(){
 
   const del = async (commentId) => {
     try {
-      await fetch(`${import.meta.env.VITE_API || 'http://localhost:8080/api'}/posts/${id}/comments/${commentId}`, {
+      await fetch(`${API}/posts/${id}/comments/${commentId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
@@ -86,31 +106,6 @@ export default function PostView(){
       <div style={{ fontSize: '1.2rem', color: '#666' }}>🔄 Cargando publicación...</div>
     </div>
   );
-
-  // Preparar todas las variantes disponibles
-  const original = post.file?.s3_key_original;
-  const variants = post.file?.variants || [];
-  
-  const allImages = [
-    { 
-      kind: 'original', 
-      src: original, 
-      name: 'Original', 
-      description: 'Imagen original sin modificaciones',
-      icon: '📸'
-    },
-    ...variants.map(v => ({
-      kind: v.kind,
-      src: v.s3_key,
-      name: getVariantName(v.kind),
-      description: v.description || getVariantDescription(v.kind),
-      icon: getVariantIcon(v.kind),
-      width: v.width,
-      height: v.height
-    }))
-  ].filter(img => img.src);
-
-  const currentImage = allImages.find(img => img.kind === selectedVariant) || allImages[0];
 
   return (
     <div style={{ 
@@ -146,194 +141,36 @@ export default function PostView(){
         boxShadow: '0 8px 32px rgba(167,118,147,0.2)'
       }}>
         
-        {/* Imagen principal */}
-        <div style={{ marginBottom: '2rem' }}>
-          <div style={{ 
-            position: 'relative',
-            borderRadius: '16px',
-            overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.1)'
-          }}>
-            <img 
-              src={`${STATIC}/${currentImage.src}`} 
-              alt={post.text || 'Publicación'} 
-              style={{ 
-                width: '100%', 
-                height: 'auto',
-                display: 'block',
-                maxHeight: '70vh',
-                objectFit: 'contain',
-                background: '#f8f9fa'
+        {/* Media principal (imágenes/videos) */}
+        {mediaCount > 0 && (
+          <div style={{ marginBottom: '2rem' }}>
+            <MediaCarousel 
+              media={post.media || []}
+              legacyFile={post.file}
+              legacyFilter={post.filter}
+              style={{
+                borderRadius: '16px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                maxHeight: '70vh'
               }}
+              showControls={true}
             />
-            
-            {/* Indicador de variante actual */}
-            <div style={{
-              position: 'absolute',
-              top: '1rem',
-              right: '1rem',
-              background: 'rgba(0,0,0,0.7)',
-              color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '20px',
-              fontSize: '0.9rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              {currentImage.icon} {currentImage.name}
-            </div>
           </div>
+        )}
 
-          {/* Descripción de la imagen */}
-          {post.text && (
-            <div style={{ 
-              marginTop: '1rem', 
-              fontSize: '1.1rem', 
-              color: '#333',
-              padding: '1rem',
-              background: 'rgba(242,243,244,0.5)',
-              borderRadius: '12px'
-            }}>
-              {post.text}
-            </div>
-          )}
-        </div>
-
-        {/* Selector de variantes */}
-        <div style={{ marginBottom: '2rem' }}>
-          <h3 style={{ 
-            margin: '0 0 1rem 0', 
-            color: '#174871',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            🎨 Transformaciones disponibles ({allImages.length})
-          </h3>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-            gap: '0.75rem',
-            marginBottom: '1rem'
-          }}>
-            {allImages.map(img => (
-              <button
-                key={img.kind}
-                onClick={() => setSelectedVariant(img.kind)}
-                style={{
-                  background: selectedVariant === img.kind ? 
-                    'linear-gradient(135deg, #A77693, #174871)' : 
-                    'rgba(242,243,244,0.8)',
-                  color: selectedVariant === img.kind ? 'white' : '#174871',
-                  border: 'none',
-                  padding: '0.75rem',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.25rem'
-                }}
-              >
-                <span style={{ fontSize: '1.2rem' }}>{img.icon}</span>
-                <span>{img.name}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Información de la variante actual */}
-          <div style={{
+        {/* Descripción del post */}
+        {post.text && (
+          <div style={{ 
+            marginBottom: '2rem',
+            fontSize: '1.1rem', 
+            color: '#333',
             padding: '1rem',
-            background: 'rgba(23,72,113,0.1)',
-            borderRadius: '12px',
-            fontSize: '0.9rem',
-            color: '#174871'
+            background: 'rgba(242,243,244,0.5)',
+            borderRadius: '12px'
           }}>
-            <strong>{currentImage.name}:</strong> {currentImage.description}
-            {currentImage.width && currentImage.height && (
-              <span style={{ marginLeft: '1rem', opacity: 0.8 }}>
-                📐 {currentImage.width}×{currentImage.height}px
-              </span>
-            )}
+            {post.text}
           </div>
-        </div>
-
-        {/* Galería de miniaturas */}
-        <div style={{ marginBottom: '2rem' }}>
-          <button
-            onClick={() => setShowAllVariants(!showAllVariants)}
-            style={{
-              background: 'rgba(167,118,147,0.1)',
-              border: '1px solid rgba(167,118,147,0.3)',
-              color: '#A77693',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              marginBottom: '1rem'
-            }}
-          >
-            {showAllVariants ? '🔼 Ocultar galería' : '🔽 Ver todas las transformaciones'}
-          </button>
-
-          {showAllVariants && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1rem',
-              padding: '1rem',
-              background: 'rgba(242,243,244,0.3)',
-              borderRadius: '16px'
-            }}>
-              {allImages.map(img => (
-                <div
-                  key={img.kind}
-                  onClick={() => setSelectedVariant(img.kind)}
-                  style={{
-                    cursor: 'pointer',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    boxShadow: selectedVariant === img.kind ? 
-                      '0 4px 16px rgba(167,118,147,0.4)' : 
-                      '0 2px 8px rgba(0,0,0,0.1)',
-                    transform: selectedVariant === img.kind ? 'scale(1.02)' : 'scale(1)',
-                    transition: 'all 0.3s ease',
-                    background: 'white'
-                  }}
-                >
-                  <img
-                    src={`${STATIC}/${img.src}`}
-                    alt={img.name}
-                    style={{
-                      width: '100%',
-                      height: '150px',
-                      objectFit: 'cover',
-                      display: 'block'
-                    }}
-                  />
-                  <div style={{
-                    padding: '0.75rem',
-                    textAlign: 'center',
-                    background: selectedVariant === img.kind ? 
-                      'linear-gradient(135deg, #A77693, #174871)' : 
-                      'white',
-                    color: selectedVariant === img.kind ? 'white' : '#174871'
-                  }}>
-                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                      {img.icon} {img.name}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Interacciones sociales */}
         <div style={{ 
