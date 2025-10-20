@@ -1,13 +1,23 @@
-import React, { useState } from 'react';
-import ReCAPTCHA from 'react-google-recaptcha';
+import React, { useState, useCallback, useEffect } from 'react';
 import { postJSON } from '../api';
 import '../styles/modern-auth.css';
+import { GoogleLogin } from '@react-oauth/google';
+import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
+// El componente principal ahora está envuelto para usar el hook de reCAPTCHA
 function Login({ onLoginSuccess, onSwitchToRegister }) {
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [captchaValue, setCaptchaValue] = useState(null);
+  
+  // Hook de reCAPTCHA v3
+  const { executeRecaptcha, recaptchaAvailable } = useGoogleReCaptcha();
+
+  // Debug: Verificar el estado de reCAPTCHA
+  useEffect(() => {
+    console.log('🔐 reCAPTCHA disponible:', recaptchaAvailable);
+    console.log('🔑 executeRecaptcha:', executeRecaptcha ? 'Listo' : 'No disponible');
+  }, [recaptchaAvailable, executeRecaptcha]);
 
   const loginBg = {
     position: 'fixed',
@@ -25,20 +35,23 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleCaptchaChange = (value) => {
-    setCaptchaValue(value);
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
+    if (!executeRecaptcha) {
+      setError('reCAPTCHA no está disponible. Por favor, recarga la página.');
+      return;
+    }
     setLoading(true);
     setError('');
 
     try {
+      // Obtener token de reCAPTCHA v3 antes de enviar
+      const recaptchaToken = await executeRecaptcha('login');
+      
       const data = await postJSON('/auth/login', {
         identifier: formData.identifier,
         password: formData.password,
-        recaptcha: captchaValue,
+        recaptcha: recaptchaToken,
       });
 
       localStorage.setItem('token', data.token);
@@ -47,10 +60,32 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
     } catch (error) {
       console.error('Login error:', error);
       setError(error.message || 'Error de conexión. Por favor intenta de nuevo.');
-      setCaptchaValue(null);
     } finally {
-      setLoading(false); // ✅ solo estados, no JSX
+      setLoading(false);
     }
+  }, [executeRecaptcha, recaptchaAvailable, formData, onLoginSuccess]);
+
+  const handleGoogleLoginSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError('');
+    try {
+      const idToken = credentialResponse.credential;
+      const data = await postJSON('/auth/google-login', { token: idToken });
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      onLoginSuccess(data.user, data.token);
+    } catch (error) {
+      console.error('Google login error:', error);
+      setError(error.message || 'Error al iniciar sesión con Google.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+    console.error('Google login failed');
+    setError('El inicio de sesión con Google falló. Por favor, intenta de nuevo.');
   };
 
   return (
@@ -205,16 +240,6 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
               />
             </div>
 
-            <div
-              className="captcha-container"
-              style={{ marginBottom: '1.2rem', display: 'flex', justifyContent: 'center' }}
-            >
-              <ReCAPTCHA
-                sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
-                onChange={handleCaptchaChange}
-              />
-            </div>
-
             {error && (
               <div
                 className="error-message"
@@ -229,10 +254,28 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
               </div>
             )}
 
+            {/* Advertencia si reCAPTCHA no está disponible */}
+            {!executeRecaptcha && (
+              <div
+                style={{
+                  background: 'rgba(255, 193, 7, 0.15)',
+                  border: '1px solid rgba(255, 193, 7, 0.4)',
+                  borderRadius: 12,
+                  padding: '12px 16px',
+                  marginBottom: 18,
+                  textAlign: 'center',
+                  fontSize: '0.9rem',
+                  color: 'rgba(255, 193, 7, 0.95)',
+                }}
+              >
+                ⚠️ Cargando reCAPTCHA... Por favor espera.
+              </div>
+            )}
+
             <button
               type="submit"
               className="auth-button"
-              disabled={loading || !captchaValue}
+              disabled={loading || !executeRecaptcha}
               style={{
                 fontWeight: 700,
                 fontSize: '1.15rem',
@@ -259,51 +302,38 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
               fontWeight: 500,
               letterSpacing: 1,
               margin: '1.2rem 0',
-            }}
-          >
-            <span>O</span>
-          </div>
-
-          <a
-            href={`${import.meta.env.VITE_API || 'http://localhost:3001/api'}/auth/google`}
-            className="google-login-button"
-            style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.7rem',
-              width: '100%',
-              padding: '0.8rem 0',
-              borderRadius: 20,
-              background: 'var(--bg-card)',
-              color: '#185adb',
-              fontWeight: 600,
-              fontSize: '1rem',
-              boxShadow: '0 2px 8px #185adb22',
-              marginBottom: 18,
-              border: '1px solid var(--border-color)'
+              width: '100%'
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              />
-            </svg>
-            Iniciar sesión con Google
-          </a>
+            <span style={{flex: 1, height: '1px', background: 'rgba(255,255,255,0.3)', marginRight: '1rem'}}></span>
+            <span>O</span>
+            <span style={{flex: 1, height: '1px', background: 'rgba(255,255,255,0.3)', marginLeft: '1rem'}}></span>
+          </div>
+          
+          {/* TODO: Configurar orígenes autorizados en Google Cloud Console */}
+          {/* Para habilitar: Agregar http://localhost:5173 en https://console.cloud.google.com/apis/credentials */}
+          {/*
+          <div style={{width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 18}}>
+            <GoogleLogin
+              onSuccess={handleGoogleLoginSuccess}
+              onError={handleGoogleLoginError}
+              theme="outline"
+              size="large"
+              text="signin_with"
+              shape="pill"
+              width="300px"
+            />
+          </div>
+          */}
+          
+          <div style={{width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 18, padding: '12px', background: 'rgba(255,193,7,0.1)', borderRadius: '8px', border: '1px solid rgba(255,193,7,0.3)'}}>
+            <small style={{color: 'rgba(255,193,7,0.9)', textAlign: 'center'}}>
+              ⚠️ Google Login temporalmente deshabilitado. Configure el Client ID en Google Cloud Console.
+            </small>
+          </div>
 
           <div
             className="auth-footer"
@@ -359,5 +389,19 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
   );
 }
 
-export default Login;
-// Hecho con ❤️ por Carlos S - 2025 
+// Envolver el componente Login con el proveedor de reCAPTCHA
+const LoginWrapper = (props) => {
+  const recaptchaKey = import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY;
+  
+  // Debug: Verificar que la clave se esté cargando
+  console.log('🔑 reCAPTCHA Key cargada:', recaptchaKey ? '✅ Sí' : '❌ No');
+  console.log('📝 Longitud de la clave:', recaptchaKey?.length || 0);
+  
+  return (
+    <GoogleReCaptchaProvider reCaptchaKey={recaptchaKey}>
+      <Login {...props} />
+    </GoogleReCaptchaProvider>
+  );
+};
+
+export default LoginWrapper;

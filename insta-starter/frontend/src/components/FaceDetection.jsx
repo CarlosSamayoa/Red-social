@@ -9,6 +9,9 @@ function FaceDetection({ imageFile, onFacesDetected }) {
   const [loading, setLoading] = useState(false);
   const [modelLoadingProgress, setModelLoadingProgress] = useState(0);
   const [analysisResults, setAnalysisResults] = useState(null);
+  const lastProcessedFileRef = useRef(null);
+  const isProcessingRef = useRef(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
     const loadModels = async () => {
@@ -46,16 +49,29 @@ function FaceDetection({ imageFile, onFacesDetected }) {
     loadModels();
   }, []);
 
+  // Resetear imageLoaded cuando cambie el archivo
   useEffect(() => {
-    if (imageFile && modelsLoaded) {
+    setImageLoaded(false);
+  }, [imageFile]);
+
+  useEffect(() => {
+    if (!imageFile || !modelsLoaded || !imageLoaded || isProcessingRef.current) return;
+    
+    const fileIdentifier = `${imageFile.name}_${imageFile.size}_${imageFile.lastModified}`;
+    
+    // Solo procesar si es un archivo diferente
+    if (fileIdentifier !== lastProcessedFileRef.current) {
+      lastProcessedFileRef.current = fileIdentifier;
       detectFaces();
     }
-  }, [imageFile, modelsLoaded]);
+  }, [imageFile, modelsLoaded, imageLoaded]);
 
   const detectFaces = async () => {
-    if (!imgRef.current || !modelsLoaded) return;
+    if (!imgRef.current || !modelsLoaded || isProcessingRef.current) return;
 
+    isProcessingRef.current = true;
     setLoading(true);
+    
     try {
       console.log('🔍 Iniciando análisis facial...');
       
@@ -76,7 +92,7 @@ function FaceDetection({ imageFile, onFacesDetected }) {
       setAnalysisResults(analysisData);
       
       console.log(`✅ Análisis completado: ${detections.length} cara(s) detectada(s)`);
-      
+
       // Callback con información detallada
       if (onFacesDetected) {
         onFacesDetected(detections.map((detection, index) => ({
@@ -106,6 +122,7 @@ function FaceDetection({ imageFile, onFacesDetected }) {
       console.error('❌ Error en detección facial:', error);
     } finally {
       setLoading(false);
+      isProcessingRef.current = false;
     }
   };
 
@@ -202,9 +219,8 @@ function FaceDetection({ imageFile, onFacesDetected }) {
   };
 
   const handleImageLoad = () => {
-    if (modelsLoaded) {
-      detectFaces();
-    }
+    // Marcar la imagen como cargada para activar el análisis
+    setImageLoaded(true);
   };
 
   if (!imageFile) return null;
@@ -273,16 +289,17 @@ function FaceDetection({ imageFile, onFacesDetected }) {
         <div style={{ 
           marginTop: '16px', 
           padding: '16px',
-          background: 'rgba(255,255,255,0.95)',
+          background: 'var(--bg-card, #ffffff)',
           borderRadius: '8px',
-          border: '1px solid #ddd',
-          fontSize: '14px'
+          border: '1px solid var(--border-color, #ddd)',
+          fontSize: '14px',
+          color: 'var(--text-primary, #111)'
         }}>
-          <h4 style={{ margin: '0 0 12px 0', color: '#333' }}>
+          <h4 style={{ margin: '0 0 12px 0', color: 'var(--text-primary, #333)' }}>
             📊 Análisis de Reconocimiento Facial
           </h4>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', color: 'var(--text-primary, #333)' }}>
             <div>
               <strong>👥 Caras detectadas:</strong> {analysisResults.totalFaces}
             </div>
@@ -307,7 +324,7 @@ function FaceDetection({ imageFile, onFacesDetected }) {
           </div>
           
           {analysisResults.genderDistribution && (
-            <div style={{ marginTop: '12px' }}>
+            <div style={{ marginTop: '12px', color: 'var(--text-primary, #333)' }}>
               <strong>⚥ Distribución:</strong>{' '}
               {analysisResults.genderDistribution.male > 0 && `${analysisResults.genderDistribution.male} masculino(s) `}
               {analysisResults.genderDistribution.female > 0 && `${analysisResults.genderDistribution.female} femenino(s)`}

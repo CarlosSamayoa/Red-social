@@ -68,7 +68,7 @@ function FriendRequests() {
   };
 
   const goToProfile = (username) => {
-    navigate(`/users/${username}`);
+    navigate(`/u/${username}`);
   };
 
   if (loading) {

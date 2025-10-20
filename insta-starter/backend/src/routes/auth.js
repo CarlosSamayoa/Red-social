@@ -3,6 +3,7 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { body, validationResult } from 'express-validator';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 import { issueToken, requireAuth } from '../middleware/auth.js';
 import { verifyRecaptcha } from '../utils/recaptcha.js';
@@ -60,8 +61,8 @@ router.post('/signup', [
                          !process.env.NODE_ENV; // Si NODE_ENV no está definido, asumir desarrollo
     
     if (!isDevelopment) {
-      const ok = await verifyRecaptcha(req.body.recaptcha, req.ip);
-      if (!ok) return res.status(400).json({ error: 'recaptcha_failed' });
+      const ok = await verifyRecaptcha(req.body.recaptcha, req.ip, 'signup');
+      if (!ok) return res.status(400).json({ error: 'recaptcha_failed', message: 'Verificación de reCAPTCHA fallida. Inténtalo de nuevo.' });
     }
 
     const { email, username, firstName, lastName, password } = req.body;
@@ -133,8 +134,8 @@ router.post('/login', [
     
     if (!isDevelopment) {
       console.log('🔐 Validating reCAPTCHA...');
-      const ok = await verifyRecaptcha(req.body.recaptcha, req.ip);
-      if (!ok) return res.status(400).json({ error: 'recaptcha_failed' });
+      const ok = await verifyRecaptcha(req.body.recaptcha, req.ip, 'login');
+      if (!ok) return res.status(400).json({ error: 'recaptcha_failed', message: 'Verificación de reCAPTCHA fallida. Inténtalo de nuevo.' });
     } else {
       console.log('🚫 Skipping reCAPTCHA validation in development mode');
     }
@@ -234,6 +235,85 @@ router.post('/login', [
     next(e); 
   }
 });
+
+// Inicializar cliente de Google Auth
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// Ruta para login con token de Google desde el cliente
+router.post('/google-login', async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: 'El token de Google es requerido.' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, given_name, family_name, picture } = payload;
+
+    let user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      // Si el usuario no existe, se crea uno nuevo.
+      // Genera un nombre de usuario único basado en el email.
+      const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '');
+      let username = baseUsername;
+      let userExists = await User.findOne({ username });
+      let attempts = 0;
+      while (userExists && attempts < 5) {
+        username = `${baseUsername}${Math.floor(Math.random() * 1000)}`;
+        userExists = await User.findOne({ username });
+        attempts++;
+      }
+      if (userExists) {
+         return res.status(500).json({ message: 'No se pudo generar un nombre de usuario único.' });
+      }
+
+      user = new User({
+        googleId,
+        email: email.toLowerCase(),
+        username,
+        firstName: given_name,
+        lastName: family_name,
+        name,
+        profile_image: picture,
+        is_verified: true, // El email se considera verificado por Google.
+      });
+      await user.save();
+    } else {
+      // Si el usuario ya existe, se actualiza su información de Google si es necesario.
+      user.googleId = user.googleId || googleId;
+      user.profile_image = user.profile_image || picture;
+      await user.save();
+    }
+
+    // Emitir token JWT para la sesión del usuario.
+    const jwtToken = issueToken(user);
+    
+    res.json({
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: user.name,
+        profile_image: user.profile_image,
+      },
+      token: jwtToken,
+      message: 'Inicio de sesión con Google exitoso.',
+    });
+
+  } catch (error) {
+    console.error('❌ Error en la autenticación con Google:', error);
+    next(new Error('El token de Google es inválido o ha expirado.'));
+  }
+});
+
 
 // Rutas de Google OAuth
 router.get('/google',

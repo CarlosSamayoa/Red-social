@@ -1009,7 +1009,7 @@ function PostModal({ post, onClose }) {
                 {post.user?.name?.charAt(0)?.toUpperCase() || post.user?.username?.charAt(0)?.toUpperCase() || 'U'}
               </div>
               <Link 
-                to={`/users/${post.user?.username || 'unknown'}`}
+                to={`/u/${post.user?.username || 'unknown'}`}
                 style={{ 
                   fontWeight: '600', 
                   color: '#000', 
@@ -1475,7 +1475,7 @@ function UserCard({ user, currentUser, friends, friendRequests, onFriendRequestS
       transition: 'all 0.2s ease'
     }}>
       <Link 
-        to={`/users/${user.username}`}
+        to={`/u/${user.username}`}
         style={{
           display: 'flex',
           alignItems: 'center',

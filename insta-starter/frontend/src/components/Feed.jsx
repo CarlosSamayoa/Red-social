@@ -495,7 +495,7 @@ function PostCard({ post, likes, onToggleLike, onAddComment }) {
             marginBottom: '8px'
           }}>
             <Link 
-              to={`/users/${post.user?.username || 'unknown'}`} 
+              to={`/u/${post.user?.username || 'unknown'}`} 
               className="username"
               style={{
                 fontWeight: '600',

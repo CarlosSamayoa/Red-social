@@ -6,8 +6,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-  "dev": "node --watch server.js",
-  "start": "cross-env NODE_ENV=production node server.js",
+    "dev": "node --watch server.js",
+    "start": "cross-env NODE_ENV=production node server.js",
     "lint": "eslint .",
     "seed": "node scripts/seed.js"
   },
@@ -17,7 +17,7 @@
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "express": "^4.21.2",
     "express-session": "^1.18.2",
     "express-validator": "^7.0.1",
     "google-auth-library": "^10.3.0",
