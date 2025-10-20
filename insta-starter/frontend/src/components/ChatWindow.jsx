@@ -383,7 +383,7 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
                       }}
                     >
                       <Avatar 
-                        username={otherParticipant?.username} 
+                        user={otherParticipant}
                         size={40}
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -439,7 +439,7 @@ function ChatWindow({ isOpen, onClose, targetUser }) {
                   return (
                     <>
                       <Avatar 
-                        username={otherParticipant?.username || 'Unknown'} 
+                        user={otherParticipant}
                         size={40}
                       />
                       <h4 style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '600' }}>

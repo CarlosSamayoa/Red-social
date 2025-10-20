@@ -2,18 +2,24 @@ import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import FriendRequest from '../models/FriendRequest.js';
 import User from '../models/User.js';
+import Notification from '../models/Notification.js';
 
 const router = express.Router();
 
 // Enviar solicitud de amistad
 router.post('/send', requireAuth, async (req, res) => {
   console.log('📤 POST /api/friends/send - Solicitud recibida');
+  console.log('📤 Body:', req.body);
+  console.log('📤 User:', req.user);
   try {
     const { receiverId } = req.body;
     const senderId = req.user._id;
+    
+    console.log('📤 SenderId:', senderId, 'ReceiverId:', receiverId);
 
     // Buscar el usuario receptor
     const receiver = await User.findById(receiverId);
+    console.log('📤 Receiver found:', receiver ? receiver.username : 'null');
     if (!receiver) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
@@ -24,46 +30,71 @@ router.post('/send', requireAuth, async (req, res) => {
     }
 
     // Verificar si ya existe una solicitud pendiente
+    console.log('📤 Checking existing request...');
     const existingRequest = await FriendRequest.findOne({
       sender: senderId,
       receiver: receiver._id,
       status: 'pending'
     });
+    console.log('📤 Existing request:', existingRequest ? 'found' : 'none');
 
     if (existingRequest) {
       return res.status(400).json({ error: 'Ya existe una solicitud pendiente' });
     }
 
     // Verificar si ya son amigos (solicitud aceptada)
+    console.log('📤 Checking existing friendship...');
     const existingFriendship = await FriendRequest.findOne({
       $or: [
         { sender: senderId, receiver: receiver._id, status: 'accepted' },
         { sender: receiver._id, receiver: senderId, status: 'accepted' }
       ]
     });
+    console.log('📤 Existing friendship:', existingFriendship ? 'found' : 'none');
 
     if (existingFriendship) {
       return res.status(400).json({ error: 'Ya son amigos' });
     }
 
     // Crear nueva solicitud
+    console.log('📤 Creating friend request...');
     const friendRequest = new FriendRequest({
       sender: senderId,
       receiver: receiver._id
     });
 
     await friendRequest.save();
+    console.log('📤 Friend request saved:', friendRequest._id);
 
     // Poblar información del sender para la respuesta
-    await friendRequest.populate('sender', 'username name email');
+    await friendRequest.populate('sender', 'username name email profile_image');
+    console.log('📤 Populated sender:', friendRequest.sender?.username);
+    
+    // Mapear profile_image a image
+    const friendRequestObj = friendRequest.toObject();
+    if (friendRequestObj.sender && friendRequestObj.sender.profile_image) {
+      friendRequestObj.sender.image = friendRequestObj.sender.profile_image;
+    }
+
+    // Crear notificación para el receptor
+    console.log('📤 Creating notification...');
+    await Notification.create({
+      user: receiver._id,
+      kind: 'follow',  // Usar 'follow' como tipo de notificación de amistad
+      actor: senderId,
+      entity: 'follow',
+      entity_id: friendRequest._id
+    });
+    console.log('📤 Notification created');
 
     res.json({ 
       message: 'Solicitud de amistad enviada',
-      friendRequest 
+      friendRequest: friendRequestObj
     });
 
   } catch (error) {
-    console.error('Error sending friend request:', error);
+    console.error('❌ Error sending friend request:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
@@ -78,8 +109,16 @@ router.get('/received', requireAuth, async (req, res) => {
       receiver: userId,
       status: 'pending'
     })
-    .populate('sender', 'username name email')
-    .sort({ created_at: -1 });
+    .populate('sender', 'username name email profile_image')
+    .sort({ created_at: -1 })
+    .lean();
+    
+    // Mapear profile_image a image para compatibilidad con frontend
+    requests.forEach(req => {
+      if (req.sender && req.sender.profile_image) {
+        req.sender.image = req.sender.profile_image;
+      }
+    });
 
     res.json({ requests });
 
@@ -97,8 +136,16 @@ router.get('/sent', requireAuth, async (req, res) => {
     const requests = await FriendRequest.find({
       sender: userId
     })
-    .populate('receiver', 'username name email')
-    .sort({ created_at: -1 });
+    .populate('receiver', 'username name email profile_image')
+    .sort({ created_at: -1 })
+    .lean();
+    
+    // Mapear profile_image a image
+    requests.forEach(req => {
+      if (req.receiver && req.receiver.profile_image) {
+        req.receiver.image = req.receiver.profile_image;
+      }
+    });
 
     res.json({ requests });
 
@@ -135,11 +182,28 @@ router.post('/respond/:requestId', requireAuth, async (req, res) => {
 
     await friendRequest.save();
 
-    await friendRequest.populate('sender', 'username name email');
+    await friendRequest.populate('sender', 'username name email profile_image');
+    
+    // Mapear profile_image a image
+    const friendRequestObj = friendRequest.toObject();
+    if (friendRequestObj.sender && friendRequestObj.sender.profile_image) {
+      friendRequestObj.sender.image = friendRequestObj.sender.profile_image;
+    }
+
+    // Si se acepta, crear notificación para quien envió la solicitud
+    if (action === 'accept') {
+      await Notification.create({
+        user: friendRequest.sender._id,
+        kind: 'follow',  // Usar 'follow' para aceptación de amistad
+        actor: userId,
+        entity: 'follow',
+        entity_id: friendRequest._id
+      });
+    }
 
     res.json({ 
       message: action === 'accept' ? 'Solicitud aceptada' : 'Solicitud rechazada',
-      friendRequest 
+      friendRequest: friendRequestObj 
     });
 
   } catch (error) {
@@ -160,16 +224,22 @@ router.get('/', requireAuth, async (req, res) => {
         { receiver: userId, status: 'accepted' }
       ]
     })
-    .populate('sender', 'username name email')
-    .populate('receiver', 'username name email');
+    .populate('sender', 'username name email profile_image')
+    .populate('receiver', 'username name email profile_image')
+    .lean();
 
     // Extraer la información del amigo (no el usuario actual)
     const friends = friendships.map(friendship => {
-      if (friendship.sender._id.toString() === userId) {
-        return friendship.receiver;
-      } else {
-        return friendship.sender;
+      const friend = friendship.sender._id.toString() === userId.toString() 
+        ? friendship.receiver 
+        : friendship.sender;
+      
+      // Mapear profile_image a image
+      if (friend.profile_image) {
+        friend.image = friend.profile_image;
       }
+      
+      return friend;
     });
 
     res.json({ friends });

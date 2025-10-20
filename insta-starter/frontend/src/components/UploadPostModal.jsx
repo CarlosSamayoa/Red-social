@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { postForm } from '../api';
 import FaceDetection from './FaceDetection.jsx';
 
@@ -26,6 +26,33 @@ export default function UploadPostModal({ isOpen, onClose }) {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0); // Índice del media actual en el carousel
   const [faceData, setFaceData] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [stream, setStream] = useState(null);
+  const videoRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+
+  // Efecto para actualizar el video cuando cambia el stream
+  useEffect(() => {
+    if (stream && videoRef.current && !videoRef.current.srcObject) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  // Efecto para limpiar el stream al cerrar el modal
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
+
+  // Efecto para limpiar al cerrar el modal
+  useEffect(() => {
+    if (!isOpen) {
+      stopCamera();
+    }
+  }, [isOpen]);
 
   const onChange = (e) => {
     const files = Array.from(e.target.files || []);
@@ -95,6 +122,70 @@ export default function UploadPostModal({ isOpen, onClose }) {
     setSelectedFilters([]);
     setShowFilters(false);
     setCurrentMediaIndex(0);
+    stopCamera();
+  };
+
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: 1280, height: 720 },
+        audio: false
+      });
+      setStream(mediaStream);
+      setShowCamera(true);
+      // El useEffect se encargará de asignar el srcObject
+    } catch (error) {
+      console.error('Error al acceder a la cámara:', error);
+      let errorMessage = 'No se pudo acceder a la cámara.';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Permiso denegado. Por favor permite el acceso a la cámara en la configuración de tu navegador.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = 'No se encontró ninguna cámara en tu dispositivo.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = 'La cámara está siendo usada por otra aplicación.';
+      }
+      
+      alert(errorMessage);
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      
+      canvas.toBlob((blob) => {
+        const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSelectedFiles([file]);
+          setPreviewUrls([{
+            url: reader.result,
+            type: 'image',
+            name: file.name
+          }]);
+          setSelectedFilters(['original']);
+          setShowFilters(true);
+          setCurrentMediaIndex(0);
+          setFileLabel(file.name);
+          stopCamera();
+        };
+        reader.readAsDataURL(file);
+      }, 'image/jpeg', 0.95);
+    }
   };
 
   const submit = async (e) => {
@@ -243,51 +334,160 @@ export default function UploadPostModal({ isOpen, onClose }) {
         </div>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* File Input */}
+          {/* File Input y Cámara */}
           <div>
             <input
               name="files"
               type="file"
               accept="image/*,video/*"
               multiple
-              required
+              required={!showCamera && selectedFiles.length === 0}
               onChange={onChange}
               style={{ display: 'none' }}
               id="file-upload-modal"
             />
-            <label
-              htmlFor="file-upload-modal"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '3rem',
-                border: '2px dashed var(--border-color)',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                background: 'var(--bg-secondary)',
-                transition: 'all var(--transition-medium)',
-                color: 'var(--text-primary)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--primary)';
-                e.currentTarget.style.background = 'var(--bg-hover)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)';
-                e.currentTarget.style.background = 'var(--bg-secondary)';
-              }}
-            >
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '48px', marginBottom: '1rem' }}>📷🎥</div>
-                <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
-                  {fileLabel || 'Selecciona fotos o videos'}
-                </div>
-                <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                  {selectedFiles.length > 0 ? `${selectedFiles.length} archivo(s) seleccionado(s)` : 'Haz clic para elegir (múltiple)'}
+            
+            {!showCamera && selectedFiles.length === 0 && (
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                <label
+                  htmlFor="file-upload-modal"
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '3rem',
+                    border: '2px dashed var(--border-color)',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    background: 'var(--bg-secondary)',
+                    transition: 'all var(--transition-medium)',
+                    color: 'var(--text-primary)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--primary)';
+                    e.currentTarget.style.background = 'var(--bg-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                    e.currentTarget.style.background = 'var(--bg-secondary)';
+                  }}
+                >
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '1rem' }}>�</div>
+                    <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                      Selecciona archivos
+                    </div>
+                    <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      Fotos o videos desde tu dispositivo
+                    </div>
+                  </div>
+                </label>
+                
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '3rem',
+                    border: '2px dashed var(--border-color)',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    background: 'var(--bg-secondary)',
+                    transition: 'all var(--transition-medium)',
+                    color: 'var(--text-primary)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--accent)';
+                    e.currentTarget.style.background = 'var(--bg-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                    e.currentTarget.style.background = 'var(--bg-secondary)';
+                  }}
+                >
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '1rem' }}>📸</div>
+                    <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                      Usar cámara
+                    </div>
+                    <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      Toma una foto ahora
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+            
+            {showCamera && (
+              <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  style={{
+                    width: '100%',
+                    borderRadius: '12px',
+                    background: '#000'
+                  }}
+                />
+                <canvas ref={canvasRef} style={{ display: 'none' }} />
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={capturePhoto}
+                    style={{
+                      flex: 1,
+                      padding: '1rem',
+                      background: 'var(--gradient-primary)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all var(--transition-fast)'
+                    }}
+                  >
+                    📷 Capturar Foto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    style={{
+                      padding: '1rem 2rem',
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancelar
+                  </button>
                 </div>
               </div>
-            </label>
+            )}
+            
+            {selectedFiles.length > 0 && !showCamera && (
+              <div style={{
+                padding: '1rem',
+                background: 'var(--bg-secondary)',
+                borderRadius: '12px',
+                marginBottom: '1rem'
+              }}>
+                <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                  ✅ {selectedFiles.length} archivo(s) seleccionado(s)
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  {fileLabel}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Preview con Filtros y Carousel */}

@@ -58,9 +58,15 @@ router.post('/posts', requireAuth, [
 // Get post by id
 router.get('/posts/:id', requireAuth, async (req,res,next)=>{
   try{
-    const postDoc = await Publication.findById(req.params.id).populate('user', 'username name image').lean();
-        const post = postDoc;
+    const postDoc = await Publication.findById(req.params.id).populate('user', 'username name profile_image').lean();
+    const post = postDoc;
     if(!post) return res.status(404).json({ error:'not_found' });
+    
+    // Mapear profile_image a image para compatibilidad con frontend
+    if (post.user && post.user.profile_image) {
+      post.user.image = post.user.profile_image;
+    }
+    
     res.json({ post });
   }catch(e){ next(e); }
 });
@@ -71,11 +77,18 @@ router.get('/feed', requireAuth, [ query('page').optional().isInt({min:1}).toInt
     const following = await Follow.find({ user: req.user.id }).distinct('followed');
     const page = req.query.page || 1; const limit = req.query.limit || 12; const skip = (page-1)*limit;
     const posts = await Publication.find({ user: { $in: following } })
-      .populate('user', 'username name image')
+      .populate('user', 'username name profile_image')
       .sort({ created_at:-1 })
       .skip(skip)
       .limit(limit)
       .lean();
+    
+    // Mapear profile_image a image en todos los posts
+    posts.forEach(post => {
+      if (post.user && post.user.profile_image) {
+        post.user.image = post.user.profile_image;
+      }
+    });
     
     // Debug: Ver qué campos tienen los posts
     if (posts.length > 0) {
@@ -131,9 +144,17 @@ router.post('/posts/:id/comments', requireAuth, [ body('body').isLength({min:1})
 });
 router.get('/posts/:id/comments', requireAuth, async (req,res)=>{
   const list = await Comment.find({ post: req.params.id })
-    .populate('user', 'username name image')
+    .populate('user', 'username name profile_image')
     .sort({ created_at:-1 })
     .lean();
+  
+  // Mapear profile_image a image en todos los comentarios
+  list.forEach(comment => {
+    if (comment.user && comment.user.profile_image) {
+      comment.user.image = comment.user.profile_image;
+    }
+  });
+  
   res.json({ comments: list });
 });
 router.delete('/comments/:id', requireAuth, async (req,res)=>{
@@ -178,10 +199,17 @@ router.get('/feed/infinite', requireAuth, [
         page: 1,
         limit: followedWeight,
         sort: { created_at: -1 },
-        populate: { path: 'user', select: 'username name image' },
+        populate: { path: 'user', select: 'username name profile_image' },
         lean: true
       }
     );
+    
+    // Mapear profile_image a image
+    followedPosts.docs.forEach(post => {
+      if (post.user && post.user.profile_image) {
+        post.user.image = post.user.profile_image;
+      }
+    });
 
     // 4. Posts trending (con más likes recientes)
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -219,7 +247,7 @@ router.get('/feed/infinite', requireAuth, [
       { $limit: trendingWeight },
       {
         $project: {
-          user: { username: 1, name: 1, image: 1 },
+          user: { username: 1, name: 1, profile_image: 1 },
           text: 1,
           location: 1,
           file: 1,
@@ -228,6 +256,13 @@ router.get('/feed/infinite', requireAuth, [
         }
       }
     ]);
+    
+    // Mapear profile_image a image en trending posts
+    trendingPosts.forEach(post => {
+      if (post.user && post.user.profile_image) {
+        post.user.image = post.user.profile_image;
+      }
+    });
 
     // 5. Posts aleatorios (descubrimiento)
     const randomPosts = await Publication.aggregate([
@@ -243,7 +278,7 @@ router.get('/feed/infinite', requireAuth, [
       { $unwind: '$user' },
       {
         $project: {
-          user: { username: 1, name: 1, image: 1 },
+          user: { username: 1, name: 1, profile_image: 1 },
           text: 1,
           location: 1,
           file: 1,
@@ -252,6 +287,13 @@ router.get('/feed/infinite', requireAuth, [
         }
       }
     ]);
+    
+    // Mapear profile_image a image en random posts
+    randomPosts.forEach(post => {
+      if (post.user && post.user.profile_image) {
+        post.user.image = post.user.profile_image;
+      }
+    });
 
     // 6. Mezclar algoritmos tipo Instagram/TikTok
     let mixedPosts = [];

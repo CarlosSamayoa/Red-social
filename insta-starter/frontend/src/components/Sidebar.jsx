@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import Avatar from './Avatar.jsx';
 
 const Sidebar = ({ user, onLogout, notificationCount = 0 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -94,9 +95,12 @@ const Sidebar = ({ user, onLogout, notificationCount = 0 }) => {
 
       <div className="sidebar-user">
         <div className="sidebar-user-info">
-          <div className="sidebar-user-avatar">
-            {user?.firstName?.charAt(0)?.toUpperCase() || 'U'}
-          </div>
+          <Avatar 
+            username={user?.username}
+            name={`${user?.firstName || ''} ${user?.lastName || ''}`}
+            image={user?.image}
+            size={40}
+          />
           <div className="sidebar-user-details">
             <p className="sidebar-user-name">
               {user?.firstName || ''} {user?.lastName || ''}

@@ -224,7 +224,11 @@ const ModernHeader = ({
               style={{
                 width: '44px',
                 height: '44px',
-                background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                backgroundImage: user?.image 
+                  ? `url(http://localhost:3002${user.image})` 
+                  : 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
                 border: '2px solid var(--bg-secondary)',
                 borderRadius: '12px',
                 cursor: 'pointer',
@@ -240,7 +244,7 @@ const ModernHeader = ({
               className="hover-lift"
               title={`${user?.firstName} ${user?.lastName}`}
             >
-              {user?.firstName?.charAt(0)?.toUpperCase() || '👤'}
+              {!user?.image && (user?.firstName?.charAt(0)?.toUpperCase() || '👤')}
             </button>
             
             {/* Dropdown Menu */}

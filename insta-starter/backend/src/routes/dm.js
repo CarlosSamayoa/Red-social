@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 import Conversation from '../models/Conversation.js';
 import ConversationParticipant from '../models/ConversationParticipant.js';
 import Message from '../models/Message.js';
+import Notification from '../models/Notification.js';
 import mongoose from 'mongoose';
 const router = Router();
 function assertValid(req){ const e=validationResult(req); if(!e.isEmpty()){ const msg=e.array().map(x=>`${x.path}: ${x.msg}`).join(', '); const err=new Error(msg); err.status=400; throw err; }}
@@ -92,7 +93,9 @@ router.get('/dm', requireAuth, async (req,res)=>{
               in: {
                 _id: '$$user._id',
                 username: '$$user.username',
-                email: '$$user.email'
+                email: '$$user.email',
+                profile_image: '$$user.profile_image',
+                image: '$$user.profile_image'  // Mapear para frontend
               }
             }
           }
@@ -114,13 +117,24 @@ router.get('/dm/:cid/messages', requireAuth, async (req,res)=>{
       select: 'text file user',
       populate: {
         path: 'user',
-        select: 'username'
+        select: 'username profile_image'
       }
     })
-    .populate('sender', 'username')
+    .populate('sender', 'username profile_image')
     .sort({ created_at:-1 })
     .limit(50)
     .lean();
+  
+  // Mapear profile_image a image para compatibilidad con frontend
+  msgs.forEach(msg => {
+    if (msg.sender) {
+      msg.sender.image = msg.sender.profile_image;
+    }
+    if (msg.shared_post?.user) {
+      msg.shared_post.user.image = msg.shared_post.user.profile_image;
+    }
+  });
+  
   res.json({ messages: msgs });
 });
 
@@ -128,6 +142,26 @@ router.post('/dm/:cid/messages', requireAuth, [ body('body').isLength({min:1}) ]
   try{
     assertValid(req);
     const m = await Message.create({ conversation: req.params.cid, sender: req.user._id, body: req.body.body });
+    
+    // Crear notificación para el receptor
+    const participants = await ConversationParticipant.find({ 
+      conversation: req.params.cid 
+    }).lean();
+    
+    const recipientId = participants.find(p => 
+      p.user.toString() !== req.user._id.toString()
+    )?.user;
+    
+    if (recipientId) {
+      await Notification.create({
+        user: recipientId,
+        kind: 'message',
+        actor: req.user._id,
+        entity: 'message',
+        entity_id: m._id
+      });
+    }
+    
     res.status(201).json({ message: m });
   }catch(e){ next(e); }
 });

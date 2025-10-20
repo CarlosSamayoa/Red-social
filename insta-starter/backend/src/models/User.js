@@ -51,7 +51,14 @@ const UserSchema = new Schema({
   updated_at: { type: Date, default: Date.now }
 }, { 
   versionKey: false,
-  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+// Virtual para mantener compatibilidad con 'image' en lugar de 'profile_image'
+UserSchema.virtual('image').get(function() {
+  return this.profile_image;
 });
 
 // Índices para optimizar consultas

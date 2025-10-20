@@ -1,17 +1,22 @@
 import React from 'react';
 
-// Componente Avatar reutilizable que genera avatares con iniciales
-function Avatar({ username, name, size = 40, className = '' }) {
+// Componente Avatar reutilizable que muestra imagen de perfil o iniciales
+function Avatar({ username, name, image, user, size = 40, className = '' }) {
+  // Si se pasa un objeto user, extraer los datos de ahí
+  const finalImage = image || user?.image;
+  const finalUsername = username || user?.username;
+  const finalName = name || user?.name;
+  
   // Convertir size a número si es string
   const avatarSize = typeof size === 'string' ? parseInt(size) || 40 : size || 40;
   
   // Generar iniciales del nombre de usuario o nombre
   const getInitials = () => {
-    if (name) {
-      return name.split(' ').map(word => word.charAt(0)).join('').toUpperCase().slice(0, 2);
+    if (finalName) {
+      return finalName.split(' ').map(word => word.charAt(0)).join('').toUpperCase().slice(0, 2);
     }
-    if (username) {
-      return username.charAt(0).toUpperCase();
+    if (finalUsername) {
+      return finalUsername.charAt(0).toUpperCase();
     }
     return 'U';
   };
@@ -25,7 +30,7 @@ function Avatar({ username, name, size = 40, className = '' }) {
     ];
     
     let hash = 0;
-    const str = username || name || 'default';
+    const str = finalUsername || finalName || 'default';
     for (let i = 0; i < str.length; i++) {
       hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
@@ -33,6 +38,31 @@ function Avatar({ username, name, size = 40, className = '' }) {
     return colors[Math.abs(hash) % colors.length];
   };
 
+  // Si hay imagen, mostrarla
+  if (finalImage) {
+    // Construir URL completa si la imagen no es una URL completa
+    const imageUrl = finalImage.startsWith('http') 
+      ? finalImage 
+      : `http://localhost:3002${finalImage}`;
+    
+    return (
+      <div 
+        className={`profile-pic ${className}`}
+        style={{
+          width: avatarSize,
+          height: avatarSize,
+          borderRadius: '50%',
+          backgroundImage: `url(${imageUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          flexShrink: 0,
+          border: '2px solid #e0e0e0'
+        }}
+      />
+    );
+  }
+
+  // Si no hay imagen, mostrar iniciales
   return (
     <div 
       className={`profile-pic ${className}`}

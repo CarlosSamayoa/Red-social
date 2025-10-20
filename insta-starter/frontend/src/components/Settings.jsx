@@ -11,6 +11,15 @@ export default function Settings() {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   
+  // Estados para cambio de username
+  const [usernameForm, setUsernameForm] = useState({
+    newUsername: '',
+    password: ''
+  });
+  const [usernameLoading, setUsernameLoading] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+  const [usernameSuccess, setUsernameSuccess] = useState('');
+  
   // Estados para cambio de contraseña
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -64,24 +73,48 @@ export default function Settings() {
       const formData = new FormData();
       formData.append('profile_image', profilePhoto);
 
+      console.log('📤 Enviando foto de perfil...');
       const response = await postForm('/users/profile-photo', formData);
+      console.log('📥 Respuesta del servidor:', response);
       
       if (response.success) {
-        // Actualizar usuario en localStorage
-        const updatedUser = { ...user, image: response.imageUrl };
-        setUser(updatedUser);
+        // Actualizar usuario en localStorage con TODOS los campos
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const updatedUser = { 
+          ...currentUser, 
+          image: response.imageUrl,
+          profile_image: response.imageUrl  // También agregamos profile_image por si acaso
+        };
+        
+        console.log('✅ Usuario actual:', currentUser);
+        console.log('✅ Usuario actualizado:', updatedUser);
+        console.log('✅ ImageUrl recibida:', response.imageUrl);
+        
+        // Primero guardar en localStorage
         localStorage.setItem('user', JSON.stringify(updatedUser));
+        console.log('✅ Guardado en localStorage:', JSON.parse(localStorage.getItem('user')));
+        
+        // Luego actualizar el state
+        setUser(updatedUser);
         
         // Limpiar preview
         setProfilePhoto(null);
         setPhotoPreview(null);
         
-        alert('Foto de perfil actualizada correctamente');
-        window.location.reload(); // Recargar para ver cambios
+        // Mostrar mensaje de éxito
+        alert('✅ Foto de perfil actualizada correctamente. La página se recargará para mostrar los cambios.');
+        
+        // Forzar recarga después de actualizar localStorage
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        console.error('❌ Error en respuesta:', response);
+        alert(response.error || 'Error al subir la foto');
       }
     } catch (error) {
-      console.error('Error uploading photo:', error);
-      alert('Error al subir la foto. Inténtalo de nuevo.');
+      console.error('❌ Error uploading photo:', error);
+      alert('Error al subir la foto: ' + (error.message || 'Inténtalo de nuevo'));
     } finally {
       setPhotoUploading(false);
     }
@@ -98,6 +131,67 @@ export default function Settings() {
     // Limpiar errores al escribir
     if (passwordError) setPasswordError('');
     if (passwordSuccess) setPasswordSuccess('');
+  };
+
+  // Manejar cambio de username
+  const handleUsernameChange = (e) => {
+    const { name, value } = e.target;
+    setUsernameForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    if (usernameError) setUsernameError('');
+    if (usernameSuccess) setUsernameSuccess('');
+  };
+
+  // Enviar cambio de username
+  const handleUsernameSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validaciones
+    if (usernameForm.newUsername.length < 3) {
+      setUsernameError('El nombre de usuario debe tener al menos 3 caracteres');
+      return;
+    }
+    
+    if (!usernameForm.password) {
+      setUsernameError('Debes ingresar tu contraseña actual para confirmar');
+      return;
+    }
+
+    setUsernameLoading(true);
+    setUsernameError('');
+    
+    try {
+      const response = await postJSON('/users/change-username', {
+        newUsername: usernameForm.newUsername,
+        password: usernameForm.password
+      });
+
+      if (response.success) {
+        // Actualizar usuario en localStorage
+        const updatedUser = { ...user, username: usernameForm.newUsername };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        setUsernameSuccess('Nombre de usuario cambiado correctamente');
+        setUsernameForm({
+          newUsername: '',
+          password: ''
+        });
+        
+        // Recargar después de 2 segundos
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Error changing username:', error);
+      setUsernameError(error.message || 'Error al cambiar el nombre de usuario. El nombre puede estar en uso o la contraseña es incorrecta.');
+    } finally {
+      setUsernameLoading(false);
+    }
   };
 
   // Enviar cambio de contraseña
@@ -258,7 +352,7 @@ export default function Settings() {
               width: '80px',
               height: '80px',
               borderRadius: '50%',
-              background: user?.image ? `url(${user.image})` : 'linear-gradient(135deg, #A77693, #174871)',
+              backgroundImage: user?.image ? `url(http://localhost:3002${user.image})` : 'linear-gradient(135deg, #A77693, #174871)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               display: 'flex',
@@ -384,6 +478,172 @@ export default function Settings() {
 
       {activeTab === 'security' && (
         <div>
+          {/* Sección: Cambiar Nombre de Usuario */}
+          <h2 style={{
+            fontSize: '1.5rem',
+            color: '#174871',
+            marginBottom: '20px',
+            fontWeight: '600'
+          }}>
+            Cambiar Nombre de Usuario
+          </h2>
+
+          <form onSubmit={handleUsernameSubmit} style={{
+            background: 'rgba(167, 118, 147, 0.05)',
+            padding: '30px',
+            borderRadius: '12px',
+            border: '1px solid rgba(167, 118, 147, 0.2)',
+            marginBottom: '40px'
+          }}>
+            {/* Current Username */}
+            <div style={{ 
+              marginBottom: '20px',
+              padding: '15px',
+              background: 'rgba(23, 72, 113, 0.1)',
+              borderRadius: '8px'
+            }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '5px',
+                fontWeight: '500',
+                color: '#666',
+                fontSize: '0.9rem'
+              }}>
+                Nombre de usuario actual
+              </label>
+              <div style={{
+                fontSize: '1.2rem',
+                fontWeight: '600',
+                color: '#174871'
+              }}>
+                @{user?.username}
+              </div>
+            </div>
+
+            {/* New Username */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '8px',
+                fontWeight: '600',
+                color: '#174871'
+              }}>
+                Nuevo Nombre de Usuario
+              </label>
+              <input
+                type="text"
+                name="newUsername"
+                value={usernameForm.newUsername}
+                onChange={handleUsernameChange}
+                placeholder="nuevo_usuario"
+                required
+                minLength={3}
+                pattern="[a-zA-Z0-9_]+"
+                title="Solo letras, números y guiones bajos"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid rgba(167, 118, 147, 0.2)',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  outline: 'none',
+                  transition: 'border-color 0.3s ease'
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'rgba(167, 118, 147, 0.5)'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(167, 118, 147, 0.2)'}
+              />
+              <small style={{ 
+                display: 'block', 
+                marginTop: '5px', 
+                color: '#666',
+                fontSize: '0.85rem'
+              }}>
+                Mínimo 3 caracteres. Solo letras, números y guiones bajos.
+              </small>
+            </div>
+
+            {/* Password Confirmation */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '8px',
+                fontWeight: '600',
+                color: '#174871'
+              }}>
+                Contraseña Actual (para confirmar)
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={usernameForm.password}
+                onChange={handleUsernameChange}
+                placeholder="Tu contraseña actual"
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid rgba(167, 118, 147, 0.2)',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  outline: 'none',
+                  transition: 'border-color 0.3s ease'
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'rgba(167, 118, 147, 0.5)'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(167, 118, 147, 0.2)'}
+              />
+            </div>
+
+            {/* Error/Success Messages */}
+            {usernameError && (
+              <div style={{
+                padding: '12px',
+                marginBottom: '15px',
+                background: 'rgba(231, 76, 60, 0.1)',
+                border: '1px solid rgba(231, 76, 60, 0.3)',
+                borderRadius: '8px',
+                color: '#c0392b',
+                fontSize: '0.95rem'
+              }}>
+                ⚠️ {usernameError}
+              </div>
+            )}
+
+            {usernameSuccess && (
+              <div style={{
+                padding: '12px',
+                marginBottom: '15px',
+                background: 'rgba(39, 174, 96, 0.1)',
+                border: '1px solid rgba(39, 174, 96, 0.3)',
+                borderRadius: '8px',
+                color: '#27ae60',
+                fontSize: '0.95rem'
+              }}>
+                ✅ {usernameSuccess}
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={usernameLoading}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: usernameLoading ? '#ccc' : 'linear-gradient(135deg, #A77693, #174871)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: usernameLoading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              {usernameLoading ? '⏳ Cambiando...' : '💾 Cambiar Nombre de Usuario'}
+            </button>
+          </form>
+
+          {/* Sección: Cambiar Contraseña */}
           <h2 style={{
             fontSize: '1.5rem',
             color: '#174871',

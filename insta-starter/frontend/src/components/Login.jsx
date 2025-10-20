@@ -9,6 +9,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   // Hook de reCAPTCHA v3
   const { executeRecaptcha, recaptchaAvailable } = useGoogleReCaptcha();
@@ -214,43 +215,74 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
               >
                 Contraseña
               </label>
-              <input
-                id="password"
-                type="password"
-                name="password"
-                placeholder="Tu contraseña"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{
-                  background: 'rgba(255,255,255,0.13)',
-                  color: '#e3f0ff',
-                  border: 'none',
-                  borderRadius: 24,
-                  fontSize: '1.25rem',
-                  padding: '1.2rem',
-                  boxShadow: '0 2px 8px #185adb22',
-                  width: '100%',
-                  outline: 'none',
-                  fontFamily: 'Montserrat, Segoe UI, Arial, sans-serif',
-                  fontWeight: 500,
-                  letterSpacing: 1,
-                }}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  placeholder="Tu contraseña"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  disabled={loading}
+                  style={{
+                    background: 'rgba(255,255,255,0.13)',
+                    color: '#e3f0ff',
+                    border: 'none',
+                    borderRadius: 24,
+                    fontSize: '1.25rem',
+                    padding: '1.2rem',
+                    paddingRight: '3.5rem',
+                    boxShadow: '0 2px 8px #185adb22',
+                    width: '100%',
+                    outline: 'none',
+                    fontFamily: 'Montserrat, Segoe UI, Arial, sans-serif',
+                    fontWeight: 500,
+                    letterSpacing: 1,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#e3f0ff',
+                    cursor: 'pointer',
+                    fontSize: '1.2rem',
+                    padding: '0.5rem',
+                    opacity: 0.7,
+                    transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.target.style.opacity = '1'}
+                  onMouseLeave={(e) => e.target.style.opacity = '0.7'}
+                  title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? '👁️' : '👁️‍🗨️'}
+                </button>
+              </div>
             </div>
 
             {error && (
               <div
                 className="error-message"
                 style={{
-                  color: '#e74c3c',
+                  background: 'rgba(231, 76, 60, 0.15)',
+                  border: '2px solid rgba(231, 76, 60, 0.5)',
+                  color: '#fff',
                   marginBottom: '1rem',
+                  padding: '1rem',
+                  borderRadius: '12px',
                   textAlign: 'center',
                   fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(231, 76, 60, 0.2)',
                 }}
               >
-                {error}
+                ⚠️ {error}
               </div>
             )}
 

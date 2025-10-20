@@ -120,6 +120,7 @@ function FriendRequests() {
                     <Avatar 
                       username={request.sender.username}
                       name={request.sender.fullName}
+                      image={request.sender.image}
                       size={50}
                     />
                     <div className="request-info">
@@ -163,6 +164,7 @@ function FriendRequests() {
                     <Avatar 
                       username={request.receiver.username}
                       name={request.receiver.fullName}
+                      image={request.receiver.image}
                       size={50}
                     />
                     <div className="request-info">
@@ -199,6 +201,7 @@ function FriendRequests() {
                     <Avatar 
                       username={friend.username}
                       name={friend.fullName}
+                      image={friend.image}
                       size={50}
                     />
                     <div className="friend-info">

@@ -66,7 +66,12 @@ export default function UserProfile({ currentUser, openChat }) {
         borderRadius: '15px',
         border: '1px solid rgba(222, 209, 198, 0.3)'
       }}>
-        <Avatar username={info.username} name={info.name} size={100} />
+        <Avatar 
+          username={info.username} 
+          name={info.name} 
+          image={info.image}
+          size={100} 
+        />
         <div style={{flex: 1}}>
           <h2 style={{
             margin: '0 0 8px',

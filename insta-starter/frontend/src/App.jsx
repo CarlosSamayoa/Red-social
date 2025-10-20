@@ -375,7 +375,7 @@ export default function App(){
           <Routes>
             <Route path="/" element={
               <div className="animate-fade-in-scale">
-                <Feed />
+                <Feed currentUser={user} />
               </div>
             } />
             <Route path="/u/:username" element={<UserProfile currentUser={user} openChat={openChatWithUser} />} />

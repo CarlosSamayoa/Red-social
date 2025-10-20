@@ -18,7 +18,7 @@ const IMAGE_FILTERS = {
   dramatic: 'contrast(160%) saturate(80%)'
 };
 
-function PostCard({ post, likes, onToggleLike, onAddComment }) {
+function PostCard({ post, likes, onToggleLike, onAddComment, currentUser }) {
   const [comment, setComment] = useState('')
   const [showComments, setShowComments] = useState(false)
   const [comments, setComments] = useState([])
@@ -217,7 +217,12 @@ function PostCard({ post, likes, onToggleLike, onAddComment }) {
         padding: '16px',
         gap: '12px'
       }}>
-        <Avatar username={post.user?.username} name={post.user?.name} size={40} />
+        <Avatar 
+          username={post.user?.username} 
+          name={post.user?.name} 
+          image={post.user?.image}
+          size={40} 
+        />
         <div className="post-user-info" style={{flex: 1}}>
           <h4 style={{
             margin: 0,
@@ -542,7 +547,12 @@ function PostCard({ post, likes, onToggleLike, onAddComment }) {
                   marginBottom: '8px',
                   fontSize: '14px'
                 }}>
-                  <Avatar username={comment.user?.username} name={comment.user?.name} size={24} />
+                  <Avatar 
+                    username={comment.user?.username} 
+                    name={comment.user?.name} 
+                    image={comment.user?.image}
+                    size={24} 
+                  />
                   <div style={{ flex: 1 }}>
                     <span style={{ fontWeight: '600', color: '#174871', marginRight: '6px' }}>
                       {comment.user?.username || 'user'}
@@ -578,7 +588,12 @@ function PostCard({ post, likes, onToggleLike, onAddComment }) {
         borderTop: '1px solid rgba(222, 209, 198, 0.3)',
         gap: '12px'
       }}>
-        <Avatar username="you" name="You" size={32} />
+        <Avatar 
+          username={currentUser?.username}
+          name={`${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`}
+          image={currentUser?.image}
+          size={32} 
+        />
         <form 
           onSubmit={handleComment} 
           style={{
@@ -637,7 +652,7 @@ function PostCard({ post, likes, onToggleLike, onAddComment }) {
   )
 }
 
-export default function Feed(){
+export default function Feed({ currentUser }){
   const [posts, setPosts] = useState([]);
   const [likes, setLikes] = useState({}); // postId -> {count, liked}
   const [loading, setLoading] = useState(true);
@@ -879,7 +894,8 @@ export default function Feed(){
               post={post} 
               likes={likes} 
               onToggleLike={toggleLike} 
-              onAddComment={addComment} 
+              onAddComment={addComment}
+              currentUser={currentUser}
             />
           ))}
 

@@ -56,10 +56,22 @@ router.get('/:username', requireAuth, async (req,res,next)=>{
     const u = await User.findOne({ username: req.params.username }).lean();
     if(!u) return res.status(404).json({ error:'not_found' });
     const followers = await Follow.countDocuments({ followed: u._id });
-        const following = await Follow.countDocuments({ user: u._id });
-        const posts = await Publication.countDocuments({ user: u._id });
-        const isFollowing = await Follow.findOne({ user: req.user.id, followed: u._id }).lean();
-        res.json({ user: { id:u._id, username:u.username, name:u.name, image:u.image, bio:u.bio, stats:{followers, following, posts}, isFollowing: !!isFollowing } });
+    const following = await Follow.countDocuments({ user: u._id });
+    const posts = await Publication.countDocuments({ user: u._id });
+    const isFollowing = await Follow.findOne({ user: req.user.id, followed: u._id }).lean();
+    
+    // Mapear profile_image a image para compatibilidad con frontend
+    res.json({ 
+      user: { 
+        id: u._id, 
+        username: u.username, 
+        name: u.name, 
+        image: u.profile_image || u.image,  // Usar profile_image primero, fallback a image
+        bio: u.bio, 
+        stats: { followers, following, posts }, 
+        isFollowing: !!isFollowing 
+      } 
+    });
   }catch(e){ next(e); }
 });
 
@@ -73,27 +85,44 @@ router.patch('/me', requireAuth, [
     const updates = { ...req.body, updated_at: new Date() };
     const u = await User.findByIdAndUpdate(req.user.id, updates, { new: true }).lean();
     const followers = await Follow.countDocuments({ followed: u._id });
-        const following = await Follow.countDocuments({ user: u._id });
-        const posts = await Publication.countDocuments({ user: u._id });
-        const isFollowing = await Follow.findOne({ user: req.user.id, followed: u._id }).lean();
-        res.json({ user: { id:u._id, username:u.username, name:u.name, image:u.image, bio:u.bio, stats:{followers, following, posts}, isFollowing: !!isFollowing } });
+    const following = await Follow.countDocuments({ user: u._id });
+    const posts = await Publication.countDocuments({ user: u._id });
+    const isFollowing = await Follow.findOne({ user: req.user.id, followed: u._id }).lean();
+    
+    // Mapear profile_image a image para compatibilidad
+    res.json({ 
+      user: { 
+        id: u._id, 
+        username: u.username, 
+        name: u.name, 
+        image: u.profile_image || u.image, 
+        bio: u.bio, 
+        stats: { followers, following, posts }, 
+        isFollowing: !!isFollowing 
+      } 
+    });
   }catch(e){ next(e); }
 });
 
 // Cambiar foto de perfil
 router.post('/profile-photo', requireAuth, upload.single('profile_image'), async (req, res, next) => {
   try {
+    console.log('📸 Recibiendo petición de cambio de foto de perfil');
+    console.log('Usuario:', req.user.id, req.user.username);
+    console.log('Archivo:', req.file ? req.file.filename : 'NO FILE');
+    
     if (!req.file) {
       return res.status(400).json({ error: 'No se ha subido ninguna imagen' });
     }
 
     // Construir URL de la imagen
     const imageUrl = `/static/profiles/${req.user.id}/${req.file.filename}`;
+    console.log('📍 URL de imagen:', imageUrl);
 
-    // Actualizar usuario en base de datos
+    // Actualizar usuario en base de datos (usando profile_image que es el campo real del modelo)
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
-      { image: imageUrl, updated_at: new Date() },
+      { profile_image: imageUrl, updated_at: new Date() },
       { new: true }
     ).lean();
 
@@ -101,6 +130,13 @@ router.post('/profile-photo', requireAuth, upload.single('profile_image'), async
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    console.log('✅ Usuario actualizado en BD:', {
+      id: updatedUser._id,
+      username: updatedUser.username,
+      profile_image: updatedUser.profile_image
+    });
+
+    // Retornar 'image' en la respuesta para mantener compatibilidad con el frontend
     res.json({
       success: true,
       message: 'Foto de perfil actualizada correctamente',
@@ -109,12 +145,12 @@ router.post('/profile-photo', requireAuth, upload.single('profile_image'), async
         id: updatedUser._id,
         username: updatedUser.username,
         name: updatedUser.name,
-        image: updatedUser.image
+        image: updatedUser.profile_image  // Retornar como 'image' para el frontend
       }
     });
 
   } catch (error) {
-    console.error('Error uploading profile photo:', error);
+    console.error('❌ Error uploading profile photo:', error);
     next(error);
   }
 });
@@ -161,6 +197,68 @@ router.post('/change-password', requireAuth, [
 
   } catch (error) {
     console.error('Error changing password:', error);
+    next(error);
+  }
+});
+
+// Cambiar nombre de usuario
+router.post('/change-username', requireAuth, async (req, res, next) => {
+  try {
+    const { newUsername, password } = req.body;
+
+    // Validaciones
+    if (!newUsername || !password) {
+      return res.status(400).json({ error: 'Se requiere nuevo nombre de usuario y contraseña' });
+    }
+
+    if (newUsername.length < 3) {
+      return res.status(400).json({ error: 'El nombre de usuario debe tener al menos 3 caracteres' });
+    }
+
+    // Validar formato (solo letras, números y guiones bajos)
+    if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
+      return res.status(400).json({ error: 'El nombre de usuario solo puede contener letras, números y guiones bajos' });
+    }
+
+    // Buscar usuario actual
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Verificar contraseña
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(400).json({ error: 'Contraseña incorrecta' });
+    }
+
+    // Verificar si el username ya está en uso
+    const existingUser = await User.findOne({ 
+      username: newUsername.toLowerCase(),
+      _id: { $ne: req.user.id } // Excluir al usuario actual
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Este nombre de usuario ya está en uso' });
+    }
+
+    // Actualizar username
+    await User.findByIdAndUpdate(
+      req.user.id,
+      { 
+        username: newUsername.toLowerCase(),
+        updated_at: new Date()
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Nombre de usuario cambiado correctamente',
+      newUsername: newUsername.toLowerCase()
+    });
+
+  } catch (error) {
+    console.error('Error changing username:', error);
     next(error);
   }
 });

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import ReCAPTCHA from 'react-google-recaptcha';
+import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { postJSON } from '../api';
 
 const loginBgUrl =
@@ -30,7 +30,8 @@ const carouselImages = [
   },
 ];
 
-const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
+const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
+  const { executeRecaptcha } = useGoogleReCaptcha();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -41,7 +42,8 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [captchaValue, setCaptchaValue] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [carouselIdx, setCarouselIdx] = useState(0);
   const carouselInterval = useRef(null);
 
@@ -61,14 +63,16 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
     setError('');
   };
 
-  const handleCaptchaChange = (value) => {
-    setCaptchaValue(value);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    
+    if (!executeRecaptcha) {
+      setError('reCAPTCHA no está listo. Por favor espera un momento.');
+      setLoading(false);
+      return;
+    }
     
     // Validaciones del lado del cliente
     if (!formData.firstName.trim()) {
@@ -119,19 +123,16 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
       return;
     }
     
-    if (!captchaValue) {
-      setError('Por favor completa el reCAPTCHA');
-      setLoading(false);
-      return;
-    }
-    
     try {
+      // Obtener token de reCAPTCHA v3
+      const recaptchaToken = await executeRecaptcha('register');
+      
       const data = await postJSON('/auth/register', {
         name: `${formData.firstName} ${formData.lastName}`.trim(),
         username: formData.username,
         email: formData.email,
         password: formData.password,
-        recaptcha: captchaValue,
+        recaptcha: recaptchaToken,
       });
       
       localStorage.setItem('token', data.token);
@@ -139,7 +140,6 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
       onRegisterSuccess(data.user, data.token);
     } catch (error) {
       setError(error.message || 'Error de conexión. Por favor intenta de nuevo.');
-      setCaptchaValue(null);
     } finally {
       setLoading(false);
     }
@@ -380,52 +380,95 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
                   outline: 'none',
                 }}
               />
-              <input
-                type="password"
-                name="password"
-                placeholder="Contraseña"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  background: '#2b2b3c',
-                  color: '#fff',
-                  border: '1px solid #3a3a4f',
-                  borderRadius: 8,
-                  fontSize: '1rem',
-                  padding: '0.9rem',
-                  marginBottom: '1rem',
-                  outline: 'none',
-                }}
-              />
-              <input
-                type="password"
-                name="confirmPassword"
-                placeholder="Confirmar contraseña"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  background: '#2b2b3c',
-                  color: '#fff',
-                  border: '1px solid #3a3a4f',
-                  borderRadius: 8,
-                  fontSize: '1rem',
-                  padding: '0.9rem',
-                  marginBottom: '1rem',
-                  outline: 'none',
-                }}
-              />
-
-              <div style={{ marginBottom: 10 }}>
-                <ReCAPTCHA
-                  sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
-                  onChange={handleCaptchaChange}
+              <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  placeholder="Contraseña"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    background: '#2b2b3c',
+                    color: '#fff',
+                    border: '1px solid #3a3a4f',
+                    borderRadius: 8,
+                    fontSize: '1rem',
+                    padding: '0.9rem',
+                    paddingRight: '3rem',
+                    outline: 'none',
+                  }}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '1.1rem',
+                    padding: '0.25rem',
+                    opacity: 0.6,
+                    transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.target.style.opacity = '1'}
+                  onMouseLeave={(e) => e.target.style.opacity = '0.6'}
+                  title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? '👁️' : '👁️‍🗨️'}
+                </button>
+              </div>
+              <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  name="confirmPassword"
+                  placeholder="Confirmar contraseña"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    background: '#2b2b3c',
+                    color: '#fff',
+                    border: '1px solid #3a3a4f',
+                    borderRadius: 8,
+                    fontSize: '1rem',
+                    padding: '0.9rem',
+                    paddingRight: '3rem',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '1.1rem',
+                    padding: '0.25rem',
+                    opacity: 0.6,
+                    transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.target.style.opacity = '1'}
+                  onMouseLeave={(e) => e.target.style.opacity = '0.6'}
+                  title={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                </button>
               </div>
 
               {error && (
@@ -448,7 +491,7 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
 
               <button
                 type="submit"
-                disabled={loading || !captchaValue}
+                disabled={loading}
                 style={{
                   width: '100%',
                   background: '#7d6df6',
@@ -555,6 +598,17 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
         </span>
       </footer>
     </>
+  );
+};
+
+// Wrapper con GoogleReCaptchaProvider
+const Register = (props) => {
+  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY;
+  
+  return (
+    <GoogleReCaptchaProvider reCaptchaKey={recaptchaSiteKey}>
+      <RegisterForm {...props} />
+    </GoogleReCaptchaProvider>
   );
 };
 
