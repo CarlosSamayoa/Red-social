@@ -85,13 +85,63 @@ app.use('/static', (req, res, next) => {
 }, express.static(path.join(process.cwd(), 'storage')));
 
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/insta';
-mongoose.connect(MONGO_URI).then(()=>console.log('✅ Mongo connected')).catch(e=>{
-  console.error('❌ Mongo error', e);
-  process.exit(1);
+// Conexión a MongoDB con retry logic para Cloud Run
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/insta';
+
+const connectDB = async () => {
+  const maxRetries = 5;
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      await mongoose.connect(MONGO_URI, {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+      });
+      console.log('✅ MongoDB connected successfully');
+      console.log(`📍 Database: ${mongoose.connection.name}`);
+      return;
+    } catch (error) {
+      retries++;
+      console.error(`❌ MongoDB connection attempt ${retries}/${maxRetries} failed:`, error.message);
+      if (retries === maxRetries) {
+        console.error('❌ Could not connect to MongoDB after maximum retries');
+        process.exit(1);
+      }
+      // Esperar 5 segundos antes de reintentar
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+};
+
+// Conectar a MongoDB
+connectDB();
+
+// Manejar errores de conexión después de la conexión inicial
+mongoose.connection.on('error', (err) => {
+  console.error('❌ MongoDB connection error:', err);
 });
 
-app.get('/api/health', (_,res)=>res.json({ ok:true, ts: Date.now() }));
+mongoose.connection.on('disconnected', () => {
+  console.warn('⚠️ MongoDB disconnected. Attempting to reconnect...');
+  connectDB();
+});
+
+// Health check mejorado para Cloud Run
+app.get('/health', (_, res) => {
+  const health = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  };
+  
+  const statusCode = mongoose.connection.readyState === 1 ? 200 : 503;
+  res.status(statusCode).json(health);
+});
+
+app.get('/api/health', (_, res) => res.json({ ok: true, ts: Date.now() }));
 
 app.use('/api/auth', authDevRoutes); // Rutas de desarrollo (sin rate limit)
 app.use('/api/auth', rateLimit({windowMs:15000, max:20}), authRoutes); // Rutas principales con rate limit
@@ -104,5 +154,13 @@ app.use('/api', notifRoutes);          // notifications
 app.use('/api', searchRoutes);          // search
 app.use('/api/friends', friendsRoutes); // friend requests
 
-const port = process.env.PORT || 3001;
-app.listen(port, ()=> console.log(`🚀 API on http://localhost:${port}`));
+const port = process.env.PORT || 3002;
+
+// Para Cloud Run, escuchar en 0.0.0.0
+const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+
+app.listen(port, host, () => {
+  console.log(`🚀 Server running on ${host}:${port}`);
+  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Health check: http://${host}:${port}/health`);
+});

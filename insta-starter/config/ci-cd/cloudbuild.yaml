@@ -1,0 +1,107 @@
+steps:
+  # =====================================================
+  # BACKEND: Build y Deploy
+  # =====================================================
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/red-o-backend', './backend']
+    id: 'build-backend'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/red-o-backend']
+    id: 'push-backend'
+    waitFor: ['build-backend']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'red-o-backend'
+      - '--image=gcr.io/$PROJECT_ID/red-o-backend'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--timeout=300'
+      - '--set-env-vars=NODE_ENV=production,GCS_BUCKET=red-o-images-prod,USE_GCS=true'
+      - '--set-secrets=MONGODB_URI=mongodb-uri:latest,JWT_SECRET=jwt-secret:latest,GOOGLE_CLIENT_ID=google-client-id:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest,RECAPTCHA_SECRET_KEY=recaptcha-secret:latest'
+    id: 'deploy-backend'
+    waitFor: ['push-backend']
+
+  # =====================================================
+  # FRONTEND: Build y Deploy
+  # =====================================================
+  
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Obtener URL del backend recién desplegado
+        BACKEND_URL=$(gcloud run services describe red-o-backend --region=us-central1 --format='value(status.url)')
+        echo "BACKEND_URL=$BACKEND_URL" > /workspace/backend_url.env
+    id: 'get-backend-url'
+    waitFor: ['deploy-backend']
+
+  - name: 'node:18-alpine'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        cd frontend
+        
+        # Leer URL del backend
+        source /workspace/backend_url.env
+        
+        # Crear archivo .env.production
+        cat > .env.production <<EOF
+        VITE_API_URL=$${BACKEND_URL}/api
+        VITE_GCS_IMAGES_URL=https://storage.googleapis.com/red-o-images-prod
+        EOF
+        
+        # Instalar dependencias y build
+        npm ci --only=production
+        npm run build
+    id: 'build-frontend'
+    waitFor: ['get-backend-url']
+
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['-m', 'rsync', '-r', '-d', 'frontend/dist/', 'gs://red-o-frontend-prod/']
+    id: 'deploy-frontend'
+    waitFor: ['build-frontend']
+
+  # =====================================================
+  # CLEANUP y NOTIFICACIÓN
+  # =====================================================
+  
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "======================================"
+        echo "✅ DEPLOYMENT COMPLETADO"
+        echo "======================================"
+        BACKEND_URL=$(gcloud run services describe red-o-backend --region=us-central1 --format='value(status.url)')
+        echo "Backend: $BACKEND_URL"
+        echo "Frontend: https://storage.googleapis.com/red-o-frontend-prod/index.html"
+        echo "======================================"
+    id: 'summary'
+    waitFor: ['deploy-backend', 'deploy-frontend']
+
+# Configuración del build
+timeout: 1800s  # 30 minutos
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+# Sustituciones (variables)
+substitutions:
+  _REGION: 'us-central1'
+  _BACKEND_SERVICE: 'red-o-backend'
+  _FRONTEND_BUCKET: 'red-o-frontend-prod'
+  _IMAGES_BUCKET: 'red-o-images-prod'

@@ -13,6 +13,9 @@ function FaceDetection({ imageFile, onFacesDetected }) {
   const isProcessingRef = useRef(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
+
+
+  
   useEffect(() => {
     const loadModels = async () => {
       try {
