@@ -6,11 +6,25 @@ import sharp from 'sharp';
 import crypto from 'crypto';
 import { requireAuth } from '../middleware/auth.js';
 import Publication from '../models/Publication.js';
+import { Storage } from '@google-cloud/storage';
 
 const router = Router();
 const ROOT = path.resolve(process.cwd(), 'storage'); // backend/storage
 const originals = (uid) => path.join(ROOT, 'originals', uid);
 const variants = (kind, uid) => path.join(ROOT, 'variants', kind, uid);
+
+// Initialize Google Cloud Storage client if configured
+const GCS_BUCKET = process.env.GCS_BUCKET || '';
+let gcs;
+if (GCS_BUCKET) {
+  try {
+    gcs = new Storage();
+    console.log('🔷 GCS enabled. Bucket:', GCS_BUCKET);
+  } catch (e) {
+    console.warn('⚠️ GCS initialization failed:', e.message);
+    gcs = null;
+  }
+}
 
 // Configuración mejorada de almacenamiento
 const storage = multer.diskStorage({
@@ -147,27 +161,51 @@ async function createImageVariants(originalPath, userId, metadata) {
       const outputPath = path.join(vdir, fileName);
       
       // Aplicar transformación con configuración optimizada
-      const processedImage = await transform.op(sharp(originalPath))
+      const buffer = await transform.op(sharp(originalPath))
         .jpeg({ 
           quality: transform.kind === 'thumb' ? 75 : 85,
           progressive: true,
           mozjpeg: true
         })
         .toBuffer();
-      
-      // Guardar imagen transformada
-      fs.writeFileSync(outputPath, processedImage);
-      
-      // Obtener metadatos de la imagen transformada
-      const transformedMeta = await sharp(outputPath).metadata();
+
+      // Guardar imagen transformada localmente
+      fs.writeFileSync(outputPath, buffer);
+
+      // Obtener metadatos de la imagen transformada (ANTES de borrarla)
+      const transformedMeta = await sharp(buffer).metadata();
+
+      // Si GCS está habilitado, subir la variante al bucket
+      if (gcs) {
+        try {
+          const destKey = `variants/${transform.kind}/${uid}/${fileName}`;
+          const bucket = gcs.bucket(GCS_BUCKET);
+          const file = bucket.file(destKey);
+          await file.save(buffer, {
+            metadata: { contentType: 'image/jpeg' },
+            resumable: false
+          });
+          
+          console.log(`📤 Subido a GCS: ${destKey}`);
+          
+          // Eliminar archivo local tras subida exitosa a GCS
+          try {
+            fs.unlinkSync(outputPath);
+          } catch (cleanupErr) {
+            console.warn('⚠️ No se pudo eliminar archivo local:', cleanupErr.message);
+          }
+        } catch (e) {
+          console.error('⚠️ Error subiendo variante a GCS:', e.message);
+        }
+      }
       
       variantsCreated.push({
         kind: transform.kind,
         path: outputPath,
-        s3_key: path.relative(ROOT, outputPath).replace(/\\/g, '/'),
+        s3_key: gcs ? `https://storage.googleapis.com/${GCS_BUCKET}/variants/${transform.kind}/${uid}/${fileName}` : path.relative(ROOT, outputPath).replace(/\\/g, '/'),
         width: transformedMeta.width,
         height: transformedMeta.height,
-        size: transformedMeta.size || processedImage.length,
+        size: transformedMeta.size || buffer.length,
         description: transform.description
       });
       
@@ -220,7 +258,26 @@ router.post('/uploads/local', requireAuth, upload.single('image'), async (req, r
     console.log(`✅ Se crearon ${variants.length} transformaciones automáticas`);
 
     // Preparar información del archivo para la base de datos
-    const relativeOriginalPath = path.relative(ROOT, filePath).replace(/\\/g, '/');
+    let relativeOriginalPath = path.relative(ROOT, filePath).replace(/\\/g, '/');
+
+    // Si GCS está habilitado, subir el original también
+    if (gcs) {
+      try {
+        const destKey = `originals/${userId}/${path.basename(filePath)}`;
+        const bucket = gcs.bucket(GCS_BUCKET);
+        await bucket.upload(filePath, { destination: destKey, metadata: { contentType: mime } });
+        relativeOriginalPath = `https://storage.googleapis.com/${GCS_BUCKET}/${destKey}`; // almacenar la URL completa en la DB
+        
+        // Eliminar archivo local original tras subida exitosa
+        try {
+          fs.unlinkSync(filePath);
+        } catch (cleanupErr) {
+          console.warn('⚠️ No se pudo eliminar archivo original local:', cleanupErr.message);
+        }
+      } catch (e) {
+        console.error('⚠️ Error subiendo original a GCS:', e.message);
+      }
+    }
     
     // Crear publicación en la base de datos con información extendida
     const publication = await Publication.create({
@@ -383,7 +440,7 @@ router.post('/uploads/local-multiple', requireAuth, multer({
       });
 
       const mediaItem = {
-        s3_key_original: `originals/${uid}/${file.filename}`,
+        s3_key_original: gcs ? `https://storage.googleapis.com/${GCS_BUCKET}/originals/${uid}/${file.filename}` : `originals/${uid}/${file.filename}`,
         mime: file.mimetype,
         size_bytes: file.size,
         filter: isVideo ? 'none' : filter,
@@ -415,15 +472,41 @@ router.post('/uploads/local-multiple', requireAuth, multer({
               fs.mkdirSync(vdir, { recursive: true });
               const outputPath = path.join(vdir, fileName);
 
-              const processedImage = await transform.op(sharp(originalPath))
+              const buffer = await transform.op(sharp(originalPath))
                 .jpeg({ quality: 85, mozjpeg: true })
-                .toFile(outputPath);
+                .toBuffer();
+
+              fs.writeFileSync(outputPath, buffer);
+
+              // Si GCS habilitado, subir variante al bucket
+              if (gcs) {
+                try {
+                  const destKey = `variants/${transform.kind}/${uid}/${fileName}`;
+                  const bucket = gcs.bucket(GCS_BUCKET);
+                  const file = bucket.file(destKey);
+                  await file.save(buffer, {
+                    metadata: { contentType: 'image/jpeg' },
+                    resumable: false
+                  });
+                  
+                  // Eliminar archivo local tras subida exitosa
+                  try {
+                    fs.unlinkSync(outputPath);
+                  } catch (cleanupErr) {
+                    console.warn('⚠️ No se pudo eliminar archivo local:', cleanupErr.message);
+                  }
+                } catch (gcsErr) {
+                  console.error('⚠️ Error subiendo variante a GCS:', gcsErr.message);
+                }
+              }
+
+              const processedMeta = await sharp(buffer).metadata();
 
               mediaItem.variants.push({
                 kind: transform.kind,
-                s3_key: `variants/${transform.kind}/${uid}/${fileName}`,
-                width: processedImage.width,
-                height: processedImage.height
+                s3_key: gcs ? `https://storage.googleapis.com/${GCS_BUCKET}/variants/${transform.kind}/${uid}/${fileName}` : `variants/${transform.kind}/${uid}/${fileName}`,
+                width: processedMeta.width,
+                height: processedMeta.height
               });
             } catch (err) {
               console.error(`Error generating ${transform.kind}:`, err);
@@ -442,6 +525,29 @@ router.post('/uploads/local-multiple', requireAuth, multer({
       });
 
       mediaItems.push(mediaItem);
+    }
+
+    // Si GCS habilitado, subir archivos originales al bucket
+    if (gcs) {
+      for (const file of files) {
+        try {
+          const destKey = `originals/${uid}/${file.filename}`;
+          const bucket = gcs.bucket(GCS_BUCKET);
+          await bucket.upload(file.path, { 
+            destination: destKey, 
+            metadata: { contentType: file.mimetype } 
+          });
+          
+          // Eliminar archivo local original tras subida exitosa
+          try {
+            fs.unlinkSync(file.path);
+          } catch (cleanupErr) {
+            console.warn('⚠️ No se pudo eliminar archivo original local:', cleanupErr.message);
+          }
+        } catch (gcsErr) {
+          console.error('⚠️ Error subiendo archivo original a GCS:', gcsErr.message);
+        }
+      }
     }
 
     // Crear publicación con múltiples medios

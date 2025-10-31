@@ -6,7 +6,7 @@ import User from '../models/User.js';
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID || 'tu-client-id-aqui',
   clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'tu-client-secret-aqui',
-  callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:3001/api/auth/google/callback"
+  callbackURL: process.env.GOOGLE_CALLBACK_URL || "https://inspir0.duckdns.org/api/auth/google/callback"
 }, async (accessToken, refreshToken, profile, done) => {
   try {
     // Buscar usuario existente con Google ID

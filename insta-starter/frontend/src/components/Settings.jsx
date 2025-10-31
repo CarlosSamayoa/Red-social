@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getJSON, postJSON, postForm } from '../api';
+import { getJSON, postJSON, postForm, STATIC } from '../api';
 
 export default function Settings() {
   const [user, setUser] = useState(null);
@@ -352,7 +352,7 @@ export default function Settings() {
               width: '80px',
               height: '80px',
               borderRadius: '50%',
-              backgroundImage: user?.image ? `url(http://localhost:3002${user.image})` : 'linear-gradient(135deg, #A77693, #174871)',
+              backgroundImage: user?.image ? `url(${user.image.startsWith('http://') || user.image.startsWith('https://') ? user.image : `${STATIC}/${user.image}`})` : 'linear-gradient(135deg, #A77693, #174871)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               display: 'flex',

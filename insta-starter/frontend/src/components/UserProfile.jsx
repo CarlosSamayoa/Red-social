@@ -252,7 +252,7 @@ export default function UserProfile({ currentUser, openChat }) {
               }}
             >
               <img 
-                src={`${STATIC}/${thumb}`} 
+                src={thumb ? (thumb.startsWith('http://') || thumb.startsWith('https://') ? thumb : `${STATIC}/${thumb}`) : ''} 
                 alt={p.text||'post'} 
                 style={{
                   width: '100%',

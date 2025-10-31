@@ -323,7 +323,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
               }}
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
-            </button>
+           </button>
           </form>
 
           <div
@@ -345,9 +345,6 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             <span style={{flex: 1, height: '1px', background: 'rgba(255,255,255,0.3)', marginLeft: '1rem'}}></span>
           </div>
           
-          {/* TODO: Configurar orígenes autorizados en Google Cloud Console */}
-          {/* Para habilitar: Agregar http://localhost:5173 en https://console.cloud.google.com/apis/credentials */}
-          {/*
           <div style={{width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 18}}>
             <GoogleLogin
               onSuccess={handleGoogleLoginSuccess}
@@ -359,14 +356,14 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
               width="300px"
             />
           </div>
-          */}
+ {/*
           
           <div style={{width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 18, padding: '12px', background: 'rgba(255,193,7,0.1)', borderRadius: '8px', border: '1px solid rgba(255,193,7,0.3)'}}>
             <small style={{color: 'rgba(255,193,7,0.9)', textAlign: 'center'}}>
               ⚠️ Google Login temporalmente deshabilitado. Configure el Client ID en Google Cloud Console.
             </small>
           </div>
-
+*/}
           <div
             className="auth-footer"
             style={{ color: '#fff', opacity: 0.9, marginTop: 18, textAlign: 'center' }}

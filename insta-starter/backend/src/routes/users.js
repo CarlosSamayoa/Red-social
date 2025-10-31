@@ -4,12 +4,25 @@ import bcrypt from 'bcrypt';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { Storage } from '@google-cloud/storage';
 import User from '../models/User.js';
 import Follow from '../models/Follow.js';
 import Publication from '../models/Publication.js';
 
 import { requireAuth } from '../middleware/auth.js';
 const router = Router();
+
+// Inicializar cliente de Google Cloud Storage
+const GCS_BUCKET = process.env.GCS_BUCKET;
+let gcs;
+if (GCS_BUCKET) {
+  try {
+    gcs = new Storage();
+    console.log('🔷 GCS habilitado para fotos de perfil. Bucket:', GCS_BUCKET);
+  } catch (e) {
+    console.warn('⚠️ No se pudo inicializar GCS para perfiles:', e.message);
+  }
+}
 
 // Configuración de multer para subida de fotos de perfil
 const storage = multer.diskStorage({
@@ -115,9 +128,37 @@ router.post('/profile-photo', requireAuth, upload.single('profile_image'), async
       return res.status(400).json({ error: 'No se ha subido ninguna imagen' });
     }
 
-    // Construir URL de la imagen
-    const imageUrl = `/static/profiles/${req.user.id}/${req.file.filename}`;
-    console.log('📍 URL de imagen:', imageUrl);
+    let imageUrl;
+
+    // Si GCS está habilitado, subir al bucket
+    if (gcs && GCS_BUCKET) {
+      try {
+        const destKey = `profiles/${req.user.id}/${req.file.filename}`;
+        const bucket = gcs.bucket(GCS_BUCKET);
+        await bucket.upload(req.file.path, {
+          destination: destKey,
+          metadata: { contentType: req.file.mimetype }
+        });
+        
+        imageUrl = `https://storage.googleapis.com/${GCS_BUCKET}/${destKey}`;
+        console.log('📤 Foto de perfil subida a GCS:', imageUrl);
+        
+        // Eliminar archivo local tras subida exitosa
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (cleanupErr) {
+          console.warn('⚠️ No se pudo eliminar archivo local:', cleanupErr.message);
+        }
+      } catch (gcsErr) {
+        console.error('⚠️ Error subiendo a GCS:', gcsErr.message);
+        // Fallback a ruta local
+        imageUrl = `/static/profiles/${req.user.id}/${req.file.filename}`;
+      }
+    } else {
+      // Sin GCS, usar ruta local
+      imageUrl = `/static/profiles/${req.user.id}/${req.file.filename}`;
+      console.log('📍 URL de imagen local:', imageUrl);
+    }
 
     // Actualizar usuario en base de datos (usando profile_image que es el campo real del modelo)
     const updatedUser = await User.findByIdAndUpdate(

@@ -32,27 +32,26 @@ function assertValid(req){
   const errors = validationResult(req);
   if(!errors.isEmpty()){
     const msg = errors.array().map(e=>`${e.path}: ${e.msg}`).join(', ');
-    const err = new Error(msg); err.status = 400; throw err;
+    const err = new Error(msg); 
+    err.status = 400;
+    err.validationErrors = errors.array();
+    throw err;
   }
 }
 
-router.post('/signup', [
-  body('email').isEmail().withMessage('Email válido requerido'),
-  body('username')
-    .isLength({min:3, max:30})
-    .withMessage('Usuario debe tener entre 3-30 caracteres')
-    .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage('Usuario solo puede contener letras, números y guiones bajos'),
-  body('firstName').notEmpty().withMessage('Nombre requerido'),
-  body('lastName').notEmpty().withMessage('Apellido requerido'),
-  body('password')
-    .isLength({min:8})
-    .withMessage('Contraseña debe tener al menos 8 caracteres')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Contraseña debe contener al menos: 1 minúscula, 1 mayúscula, 1 número y 1 símbolo')
-], async (req, res, next) => {
+// Reusable registration logic (used by both /signup and /register for compatibility)
+async function registerHandler(req, res, next) {
   try {
-    assertValid(req);
+    // Validar datos de entrada
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const msg = errors.array().map(e => `${e.msg}`).join(', ');
+      return res.status(400).json({
+        error: 'validation_error',
+        message: msg,
+        details: errors.array()
+      });
+    }
     
     // Verificar reCAPTCHA (saltar en desarrollo y localhost)
     const isDevelopment = process.env.NODE_ENV === 'development' || 
@@ -65,11 +64,25 @@ router.post('/signup', [
       if (!ok) return res.status(400).json({ error: 'recaptcha_failed', message: 'Verificación de reCAPTCHA fallida. Inténtalo de nuevo.' });
     }
 
-    const { email, username, firstName, lastName, password } = req.body;
-    
+    const { email, username, firstName, lastName, name, password } = req.body;
+
+    // Ensure we have at least a name (either split or single field)
+    if ((!firstName || !lastName) && !name) {
+      return res.status(400).json({ error: 'name_required', message: 'Se requiere firstName y lastName o el campo name' });
+    }
+
+    // Normalize name fields: prefer explicit firstName/lastName, otherwise split `name`
+    let normalizedFirstName = firstName;
+    let normalizedLastName = lastName;
+    if ((!normalizedFirstName || !normalizedLastName) && name) {
+      const parts = name.trim().split(/\s+/);
+      normalizedFirstName = parts[0] || username || 'Usuario';
+      normalizedLastName = parts.slice(1).join(' ') || parts[0] || 'Apellido';
+    }
+
     // Verificar si el usuario ya existe
-    const exists = await User.findOne({ 
-      $or: [{ email: email.toLowerCase() }, { username }] 
+    const exists = await User.findOne({
+      $or: [{ email: email.toLowerCase() }, { username }]
     });
     if (exists) {
       return res.status(409).json({ 
@@ -88,9 +101,9 @@ router.post('/signup', [
     const user = await User.create({ 
       email: email.toLowerCase(),
       username,
-      firstName,
-      lastName,
-      name: `${firstName} ${lastName}`, // Para compatibilidad
+      firstName: normalizedFirstName,
+      lastName: normalizedLastName,
+      name: `${normalizedFirstName} ${normalizedLastName}`, // Para compatibilidad
       password_hash,
       password_salt,
       is_verified: false // Requerirá verificación por email en el futuro
@@ -114,14 +127,51 @@ router.post('/signup', [
   } catch (e) { 
     next(e); 
   }
-});
+}
+
+// Validators used for registration routes
+const registrationValidators = [
+  body('email').isEmail().withMessage('Email válido requerido'),
+  body('username')
+    .isLength({min:3, max:30})
+    .withMessage('Usuario debe tener entre 3-30 caracteres')
+    .matches(/^[a-zA-Z0-9_]+$/)
+    .withMessage('Usuario solo puede contener letras, números y guiones bajos'),
+  // Accept a single `name` field for legacy frontends, or firstName/lastName if provided
+  body('name').optional().isLength({min:1}).withMessage('Nombre requerido'),
+  body('password')
+    .isLength({min:8})
+    .withMessage('Contraseña debe tener al menos 8 caracteres')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('Contraseña debe contener al menos: 1 minúscula, 1 mayúscula, 1 número y 1 símbolo')
+];
+
+router.post('/signup', registrationValidators, registerHandler);
+
+// Backwards-compatible route used by older frontends or when dev routes aren't mounted
+router.post('/register', registrationValidators, registerHandler);
+
+
+// End registration
+
+
+// (signup handler has been refactored into registerHandler above)
 
 router.post('/login', [
   body('identifier').notEmpty().withMessage('Email o usuario requerido'),
   body('password').isLength({min:6}).withMessage('Contraseña requerida')
 ], async (req, res, next) => {
   try {
-    assertValid(req);
+    // Validar datos de entrada
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const msg = errors.array().map(e => `${e.msg}`).join(', ');
+      return res.status(400).json({
+        error: 'validation_error',
+        message: msg,
+        details: errors.array()
+      });
+    }
     
     console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
     console.log('🔍 Skipping reCAPTCHA:', process.env.NODE_ENV === 'development');

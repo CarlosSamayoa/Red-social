@@ -20,7 +20,7 @@ const carouselImages = [
     caption: '“Lo que más importa es qué tan bien caminas a través del fuego.”',
   },
   {
-    url: 'https://images.unsplash.com/photo-1465101178521-c3a6088ed0c4?auto=format&fit=crop&w=800&q=80',
+    url: 'https://img.freepik.com/foto-gratis/tomada-vertical-pasaje-madera-sobre-pequeno-lago-reflectante-cordillera-horizonte_181624-37099.jpg?semt=ais_hybrid&w=740&q=80',
     caption:
       '“Algunas personas nunca se vuelven locas. ¡Qué vidas tan horribles deben llevar!”',
   },
@@ -111,8 +111,8 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
       return;
     }
     
-    if (formData.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+    if (formData.password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
       setLoading(false);
       return;
     }
@@ -122,10 +122,17 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
       setLoading(false);
       return;
     }
+      // Validar requisitos de contraseña segura
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    if (!passwordRegex.test(formData.password)) {
+      setError('La contraseña debe contener al menos: 1 minúscula, 1 mayúscula, 1 número y 1 símbolo (@$!%*?&)');
+      setLoading(false);
+      return;
+    }
     
     try {
-      // Obtener token de reCAPTCHA v3
-      const recaptchaToken = await executeRecaptcha('register');
+  // Obtener token de reCAPTCHA v3 (acción 'signup' para coincidir con el backend)
+  const recaptchaToken = await executeRecaptcha('signup');
       
       const data = await postJSON('/auth/register', {
         name: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -586,8 +593,8 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
           fontFamily: 'Montserrat, Segoe UI, Arial, sans-serif',
           fontWeight: 400,
           fontSize: '1.05rem',
-          textAlign: 'center',
-          padding: '1.1rem 0 0.7rem 0',
+          textAlign: 'center',         
+	  padding: '1.1rem 0 0.7rem 0',
           boxShadow: '0 -2px 16px #0a234244',
           backdropFilter: 'blur(8px)',
           zIndex: 100,

@@ -143,8 +143,18 @@ app.get('/health', (_, res) => {
 
 app.get('/api/health', (_, res) => res.json({ ok: true, ts: Date.now() }));
 
-app.use('/api/auth', authDevRoutes); // Rutas de desarrollo (sin rate limit)
-app.use('/api/auth', rateLimit({windowMs:15000, max:20}), authRoutes); // Rutas principales con rate limit
+// Montar rutas de desarrollo SOLO en entornos no productivos y solo si se habilita explícitamente.
+if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEV_ROUTES === 'true') {
+  app.use('/api/auth', authDevRoutes); // Rutas de desarrollo (sin rate limit)
+  console.log('⚙️ Dev auth routes enabled');
+} else {
+  console.log('🔒 Dev auth routes disabled');
+}
+
+// Rutas principales con rate limit (siempre montadas)
+app.use('/api/auth', rateLimit({windowMs:15000, max:20}), authRoutes);
+// Compat: algunos frontends llaman a /auth (sin /api) — montamos también para evitar 404
+app.use('/auth', rateLimit({windowMs:15000, max:20}), authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', socialRoutes);         // posts, comments, likes, follows, feed
 app.use('/api', uploadRoutes);         // presigned uploads
@@ -153,6 +163,28 @@ app.use('/api', dmRoutes);             // conversations/messages
 app.use('/api', notifRoutes);          // notifications
 app.use('/api', searchRoutes);          // search
 app.use('/api/friends', friendsRoutes); // friend requests
+
+// Middleware de manejo de errores global
+// Debe ir después de todas las rutas
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  
+  // Si ya se envió la respuesta, delegar al error handler predeterminado
+  if (res.headersSent) {
+    return next(err);
+  }
+  
+  // Establecer el código de estado
+  const statusCode = err.status || err.statusCode || 500;
+  
+  // Siempre responder con JSON
+  res.status(statusCode).json({
+    error: true,
+    message: err.message || 'Error interno del servidor',
+    status: statusCode,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
 
 const port = process.env.PORT || 3002;
 

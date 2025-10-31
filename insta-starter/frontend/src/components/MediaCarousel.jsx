@@ -62,7 +62,8 @@ export default function MediaCarousel({ media = [], legacyFile = null, legacyFil
   const mediaKey = currentMedia.variants?.find(v => v.kind === 'medium')?.s3_key || 
                    currentMedia.variants?.find(v => v.kind === 'large')?.s3_key || 
                    currentMedia.s3_key_original;
-  const mediaUrl = mediaKey ? `${STATIC}/${mediaKey}` : '';
+  // Si mediaKey ya es una URL completa (https://), usarla tal cual; si no, construir con STATIC
+  const mediaUrl = mediaKey ? (mediaKey.startsWith('http://') || mediaKey.startsWith('https://') ? mediaKey : `${STATIC}/${mediaKey}`) : '';
   const filter = IMAGE_FILTERS[currentMedia.filter] || IMAGE_FILTERS.original;
 
   const goToPrevious = () => {
@@ -294,3 +295,7 @@ export default function MediaCarousel({ media = [], legacyFile = null, legacyFil
     </div>
   );
 }
+
+
+
+

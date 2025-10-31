@@ -237,7 +237,7 @@ router.post('/register', [
   body('email').isEmail().normalizeEmail(),
   body('username').isLength({min:3, max:20}).matches(/^[a-zA-Z0-9_]+$/).withMessage('Username only letters, numbers and underscore'),
   body('name').isLength({min:1, max:50}).trim(),
-  body('password').isLength({min:6}).withMessage('Password must be at least 6 characters')
+  body('password').isLength({min:8}).withMessage('Password must be at least 8 characters')
 ], async (req, res, next) => {
   try {
     // Validar campos
@@ -249,7 +249,7 @@ router.post('/register', [
           case 'name': return 'El nombre es requerido';
           case 'username': return 'El nombre de usuario es requerido (3-20 caracteres, solo letras, números y _)';
           case 'email': return 'Ingresa un email válido';
-          case 'password': return 'La contraseña debe tener al menos 6 caracteres';
+          case 'password': return 'La contraseña debe tener al menos 8 caracteres';
           default: return e.msg;
         }
       }).join('. ');

@@ -1,4 +1,5 @@
 import React from 'react';
+import { STATIC } from '../api';
 
 // Componente Avatar reutilizable que muestra imagen de perfil o iniciales
 function Avatar({ username, name, image, user, size = 40, className = '' }) {
@@ -41,9 +42,9 @@ function Avatar({ username, name, image, user, size = 40, className = '' }) {
   // Si hay imagen, mostrarla
   if (finalImage) {
     // Construir URL completa si la imagen no es una URL completa
-    const imageUrl = finalImage.startsWith('http') 
+    const imageUrl = finalImage.startsWith('http://') || finalImage.startsWith('https://') 
       ? finalImage 
-      : `http://localhost:3002${finalImage}`;
+      : `${STATIC}/${finalImage}`;
     
     return (
       <div 

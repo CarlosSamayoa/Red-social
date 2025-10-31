@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { STATIC } from '../api';
 
 const ModernHeader = ({ 
   user, 
@@ -15,6 +16,22 @@ const ModernHeader = ({
 }) => {
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+
+  // Helper para obtener la imagen de perfil del usuario
+  const getUserProfileImage = () => {
+    const imageUrl = user?.image || user?.profile_image;
+    if (!imageUrl) return null;
+    
+    // Si es una URL completa, usarla directamente
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+    
+    // Si es una ruta relativa, construir la URL completa
+    return `${STATIC}/${imageUrl}`;
+  };
+
+  const profileImageUrl = getUserProfileImage();
 
   // Cerrar menú cuando se hace clic fuera
   React.useEffect(() => {
@@ -224,8 +241,8 @@ const ModernHeader = ({
               style={{
                 width: '44px',
                 height: '44px',
-                backgroundImage: user?.image 
-                  ? `url(http://localhost:3002${user.image})` 
+                backgroundImage: profileImageUrl
+                  ? `url(${profileImageUrl})` 
                   : 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
@@ -244,7 +261,7 @@ const ModernHeader = ({
               className="hover-lift"
               title={`${user?.firstName} ${user?.lastName}`}
             >
-              {!user?.image && (user?.firstName?.charAt(0)?.toUpperCase() || '👤')}
+              {!profileImageUrl && (user?.firstName?.charAt(0)?.toUpperCase() || '👤')}
             </button>
             
             {/* Dropdown Menu */}

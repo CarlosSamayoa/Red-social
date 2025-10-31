@@ -533,7 +533,7 @@ function PostCard({ post, onClick }) {
                post.file.s3_key_original;
   }
   
-  const fullImageUrl = imageUrl ? `${STATIC}/${imageUrl}` : null;
+  const fullImageUrl = imageUrl ? (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') ? imageUrl : `${STATIC}/${imageUrl}`) : null;
   console.log('Image URL for post:', imageUrl);
   console.log('Full image URL for post:', fullImageUrl);
   console.log('Has multiple media:', hasMultipleMedia, 'count:', mediaArray.length);

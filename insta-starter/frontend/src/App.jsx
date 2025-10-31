@@ -290,7 +290,7 @@ export default function App(){
           <DevLogin onLogin={handleAuthSuccess} />
         )}
         
-        {/* Enlaces para cambiar entre modos */}
+        {/* Enlaces para cambiar entre modos 
         <div style={{
           position: 'fixed',
           bottom: '20px',
@@ -317,7 +317,7 @@ export default function App(){
           >
             Dev Login
           </button>
-        </div>
+        </div>*/}
       </div>
     )
   }
